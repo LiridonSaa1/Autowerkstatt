@@ -1,0 +1,67 @@
+Build a modern, responsive, high-performance web application for an auto repair and car servicing shop ("Auto Service & Detailing Hub").
+
+### Tech Stack:
+- Frontend: React / Next.js (or Vite + React) with Tailwind CSS, Lucide Icons, and Framer Motion for sleek automotive aesthetics.
+- Backend & DB: Node.js (Express) with PostgreSQL (or SQLite/Drizzle ORM for local state persistence) and session-based or JWT authentication for the Admin panel.
+
+### Core Architecture & Pages:
+
+1. Navigation Bar (Header):
+   - Brand logo and name.
+   - Smooth-scroll anchor links to: Hero, Services, Our Work, About Us, Testimonials, Book Appointment, Contact.
+   - Quick "Book Now" CTA button and an Admin Login link.
+
+2. Hero / Main Section:
+   - High-impact dark automotive UI theme.
+   - Bold headline, brief value proposition, primary CTA ("Rezervo Terminin") and secondary CTA ("Shiko Shërbimet").
+   - Quick stats badges (e.g., "10+ Vite Përvojë", "5000+ Vetura të Rregulluara", "Pjesë Origjinale").
+
+3. About Us Section:
+   - Company story, expertise, state-of-the-art garage equipment, certified mechanics, and customer-first guarantees.
+
+4. Services Section:
+   - Interactive service cards with icons, short descriptions, and pricing indicators (e.g., Diagnostifikim Kompjuterik, Servis i Rregullt / Vaj & Filtra, Frenat & Amortizimi, Rregullim Motori, Auto Elektrikë, Klimatizim & Kondicioner).
+   - Each card should have a direct button to "Book This Service".
+
+5. Interactive Online Booking System (Terminet Online):
+   - Step 1: Service selection (multi-select or dropdown with custom text input if not listed).
+   - Step 2: Vehicle details input (Make, Model, Year, License Plate/VIN optional).
+   - Step 3: Real-time Date & Time Slot Picker:
+     - Calendar view showing open days.
+     - Dynamic time slots (e.g., 09:00, 10:00, 11:30, 14:00, 15:30).
+     - Slots already booked in the database MUST show as unavailable / disabled in real-time.
+   - Step 4: Customer contact info (Full Name, Phone Number, Email, Notes/Symptoms).
+   - Instant confirmation popup/toast upon submission with a tracking reference code.
+
+6. Our Work / Portfolio (Our Jobs):
+   - Visual gallery of completed car repairs, maintenance, and diagnostics.
+   - Filterable tabs (e.g., "All", "Motor", "Frena & Pjesë", "Detaje & Estetikë").
+   - Before/After photo comparison sliders or clean modal previews.
+
+7. Client Reviews & Moderation (Comments / Dëshmi):
+   - Public review submission form: Customer Name, Car Model, Rating (1-5 stars), Comment text.
+   - Critical Requirement: Reviews do NOT appear immediately. They enter a `pending` status in the database.
+   - Only reviews set to `approved` by the Admin appear on the public website.
+
+8. Contact Form & Location:
+   - Interactive contact form (Name, Email, Subject, Message) with form validation.
+   - Shop details: Phone numbers, WhatsApp link, physical address, working hours, and an embedded Google Map preview.
+
+9. Footer:
+   - Quick links, emergency breakdown assistance phone number, social links, working hours, and copyright notice.
+
+### Admin Dashboard (Backend `/admin`):
+- Protected login screen (default credentials configured via environment variables or seed data).
+- Appointments Manager:
+  - Table view of all appointments (Date, Time, Client, Car, Services, Status).
+  - Ability to approve, reschedule, cancel, or mark appointments as completed.
+  - Ability to block specific dates or custom time slots (holidays, shop maintenance).
+- Review Moderation Queue:
+  - List pending reviews with "Approve" and "Reject/Delete" actions.
+- Portfolio Manager:
+  - Simple form to upload/add new job cards (Title, Category, Description, Image URL).
+
+### Design & UX Standards:
+- Mobile-first, fully responsive design.
+- Dark mode aesthetic with high-contrast accent colors (e.g., dark slate gray background `#0f172a` with automotive amber/cyan highlights).
+- Pre-populate database with realistic seed data: 6-8 services, 4 portfolio items, 3 approved reviews, and booked appointment slots for testing.
