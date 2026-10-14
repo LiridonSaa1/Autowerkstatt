@@ -1,22 +1,20 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Public website and shop administration API
 servers:
   - url: /api
-    description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: public
+  - name: admin
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +22,579 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /shop:
+    get:
+      operationId: getShopInfo
+      tags: [public]
+      summary: Get public shop details
+      responses:
+        "200":
+          description: Shop details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShopInfo"
+  /services:
+    get:
+      operationId: listServices
+      tags: [public]
+      summary: List repair and detailing services
+      responses:
+        "200":
+          description: Services
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Service"
+  /portfolio:
+    get:
+      operationId: listPortfolio
+      tags: [public]
+      summary: List completed work
+      responses:
+        "200":
+          description: Portfolio entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PortfolioItem"
+    post:
+      operationId: createPortfolioItem
+      tags: [admin]
+      summary: Add a completed job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PortfolioInput"
+      responses:
+        "201":
+          description: Portfolio entry created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortfolioItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /portfolio/{id}:
+    delete:
+      operationId: deletePortfolioItem
+      tags: [admin]
+      summary: Remove a portfolio entry
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Portfolio entry removed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /reviews:
+    get:
+      operationId: listApprovedReviews
+      tags: [public]
+      summary: List approved customer reviews
+      responses:
+        "200":
+          description: Approved reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Review"
+    post:
+      operationId: createReview
+      tags: [public]
+      summary: Submit a review for moderation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewInput"
+      responses:
+        "201":
+          description: Review submitted for moderation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionReceipt"
+  /availability:
+    get:
+      operationId: getAvailability
+      tags: [public]
+      summary: Get open appointment slots for a month
+      parameters:
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: "^\\d{4}-\\d{2}$"
+      responses:
+        "200":
+          description: Daily appointment availability
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DayAvailability"
+  /appointments:
+    post:
+      operationId: createAppointment
+      tags: [public]
+      summary: Book a service appointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppointmentInput"
+      responses:
+        "201":
+          description: Appointment received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingReceipt"
+        "409":
+          description: The selected time is no longer available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /contact:
+    post:
+      operationId: createContactMessage
+      tags: [public]
+      summary: Send a contact message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactMessageInput"
+      responses:
+        "201":
+          description: Message received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionReceipt"
+  /admin/summary:
+    get:
+      operationId: getAdminSummary
+      tags: [admin]
+      summary: Get appointment and moderation totals
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /admin/contact-messages:
+    get:
+      operationId: listAdminContactMessages
+      tags: [admin]
+      summary: List customer contact messages
+      responses:
+        "200":
+          description: Contact messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminContactMessage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /admin/appointments:
+    get:
+      operationId: listAdminAppointments
+      tags: [admin]
+      summary: List all service appointments
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/AppointmentStatus"
+      responses:
+        "200":
+          description: Appointments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminAppointment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /admin/appointments/{id}:
+    patch:
+      operationId: updateAppointment
+      tags: [admin]
+      summary: Update appointment status or time
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppointmentUpdate"
+      responses:
+        "200":
+          description: Updated appointment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminAppointment"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: The requested time is already occupied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /admin/reviews:
+    get:
+      operationId: listAdminReviews
+      tags: [admin]
+      summary: List reviews waiting for moderation
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ReviewStatus"
+      responses:
+        "200":
+          description: Reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminReview"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /admin/reviews/{id}:
+    patch:
+      operationId: moderateReview
+      tags: [admin]
+      summary: Approve or reject a review
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewDecision"
+      responses:
+        "200":
+          description: Moderated review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminReview"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /admin/blocked-slots:
+    get:
+      operationId: listBlockedSlots
+      tags: [admin]
+      summary: List blocked dates and time slots
+      responses:
+        "200":
+          description: Blocked slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BlockedSlot"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      operationId: createBlockedSlot
+      tags: [admin]
+      summary: Block a date or a time slot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlockedSlotInput"
+      responses:
+        "201":
+          description: Block created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlockedSlot"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /admin/blocked-slots/{id}:
+    delete:
+      operationId: deleteBlockedSlot
+      tags: [admin]
+      summary: Reopen a blocked date or slot
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "204":
+          description: Block removed
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+  responses:
+    Unauthorized:
+      description: Sign in with the shop administrator account
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    NotFound:
+      description: Record not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
   schemas:
     HealthStatus:
       type: object
       properties:
         status:
           type: string
-      required:
-        - status
-
+      required: [status]
+    ApiError:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    ShopInfo:
+      type: object
+      properties:
+        name: { type: string }
+        tagline: { type: string }
+        phone: { type: string }
+        whatsapp: { type: string }
+        address: { type: string }
+        city: { type: string }
+        emergencyPhone: { type: string }
+        openingHours: { type: string }
+        mapUrl: { type: string }
+      required: [name, tagline, phone, whatsapp, address, city, emergencyPhone, openingHours, mapUrl]
+    Service:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        category: { type: string }
+        description: { type: string }
+        priceLabel: { type: string }
+        durationMinutes: { type: integer }
+      required: [id, name, category, description, priceLabel, durationMinutes]
+    PortfolioItem:
+      type: object
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        category: { type: string }
+        description: { type: string }
+        imageUrl: { type: string }
+        vehicleLabel: { type: string }
+        completedAt: { type: ["string", "null"], format: date }
+      required: [id, title, category, description, imageUrl, vehicleLabel, completedAt]
+    PortfolioInput:
+      type: object
+      properties:
+        title: { type: string, minLength: 2, maxLength: 120 }
+        category: { type: string, minLength: 2, maxLength: 80 }
+        description: { type: string, minLength: 2, maxLength: 1000 }
+        imageUrl: { type: string, format: uri }
+        vehicleLabel: { type: string, maxLength: 120 }
+      required: [title, category, description, imageUrl, vehicleLabel]
+    Review:
+      type: object
+      properties:
+        id: { type: integer }
+        customerName: { type: string }
+        carModel: { type: string }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        comment: { type: string }
+        createdAt: { type: string, format: date-time }
+      required: [id, customerName, carModel, rating, comment, createdAt]
+    AdminReview:
+      allOf:
+        - $ref: "#/components/schemas/Review"
+        - type: object
+          properties:
+            status:
+              $ref: "#/components/schemas/ReviewStatus"
+          required: [status]
+    ReviewInput:
+      type: object
+      properties:
+        customerName: { type: string, minLength: 2, maxLength: 120 }
+        carModel: { type: string, minLength: 2, maxLength: 120 }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        comment: { type: string, minLength: 8, maxLength: 2000 }
+      required: [customerName, carModel, rating, comment]
+    ReviewStatus:
+      type: string
+      enum: [pending, approved, rejected]
+    ReviewDecision:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected]
+      required: [status]
+    DayAvailability:
+      type: object
+      properties:
+        date: { type: string, format: date }
+        open: { type: boolean }
+        slots:
+          type: array
+          items:
+            $ref: "#/components/schemas/AvailabilitySlot"
+      required: [date, open, slots]
+    AvailabilitySlot:
+      type: object
+      properties:
+        time: { type: string }
+        available: { type: boolean }
+      required: [time, available]
+    AppointmentInput:
+      type: object
+      properties:
+        serviceId: { type: string }
+        customService: { type: ["string", "null"], maxLength: 160 }
+        vehicleMake: { type: string, minLength: 1, maxLength: 80 }
+        vehicleModel: { type: string, minLength: 1, maxLength: 80 }
+        vehicleYear: { type: integer, minimum: 1950, maximum: 2100 }
+        licensePlate: { type: ["string", "null"], maxLength: 24 }
+        vin: { type: ["string", "null"], maxLength: 40 }
+        appointmentDate: { type: string, format: date }
+        appointmentTime: { type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }
+        customerName: { type: string, minLength: 2, maxLength: 120 }
+        phone: { type: string, minLength: 5, maxLength: 40 }
+        email: { type: string, format: email }
+        notes: { type: ["string", "null"], maxLength: 2000 }
+      required: [serviceId, vehicleMake, vehicleModel, vehicleYear, appointmentDate, appointmentTime, customerName, phone, email]
+    AppointmentStatus:
+      type: string
+      enum: [pending, approved, cancelled, completed]
+    BookingReceipt:
+      type: object
+      properties:
+        referenceCode: { type: string }
+        message: { type: string }
+      required: [referenceCode, message]
+    SubmissionReceipt:
+      type: object
+      properties:
+        message: { type: string }
+      required: [message]
+    AdminAppointment:
+      type: object
+      properties:
+        id: { type: integer }
+        referenceCode: { type: string }
+        appointmentDate: { type: string, format: date }
+        appointmentTime: { type: string }
+        customerName: { type: string }
+        phone: { type: string }
+        email: { type: string }
+        vehicleMake: { type: string }
+        vehicleModel: { type: string }
+        vehicleYear: { type: integer }
+        licensePlate: { type: ["string", "null"] }
+        serviceName: { type: string }
+        customService: { type: ["string", "null"] }
+        notes: { type: ["string", "null"] }
+        status:
+          $ref: "#/components/schemas/AppointmentStatus"
+        createdAt: { type: string, format: date-time }
+      required: [id, referenceCode, appointmentDate, appointmentTime, customerName, phone, email, vehicleMake, vehicleModel, vehicleYear, licensePlate, serviceName, customService, notes, status, createdAt]
+    AppointmentUpdate:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/AppointmentStatus"
+        appointmentDate: { type: string, format: date }
+        appointmentTime: { type: string, pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }
+    AdminSummary:
+      type: object
+      properties:
+        pendingAppointments: { type: integer }
+        totalAppointments: { type: integer }
+        upcomingAppointments: { type: integer }
+        pendingReviews: { type: integer }
+        blockedSlots: { type: integer }
+      required: [pendingAppointments, totalAppointments, upcomingAppointments, pendingReviews, blockedSlots]
+    AdminContactMessage:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string }
+        subject: { type: string }
+        message: { type: string }
+        createdAt: { type: string, format: date-time }
+        status: { type: string }
+      required: [id, name, email, subject, message, createdAt, status]
+    BlockedSlot:
+      type: object
+      properties:
+        id: { type: integer }
+        date: { type: string, format: date }
+        time: { type: ["string", "null"] }
+        reason: { type: string }
+      required: [id, date, time, reason]
+    BlockedSlotInput:
+      type: object
+      properties:
+        date: { type: string, format: date }
+        time: { type: ["string", "null"], pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }
+        reason: { type: string, minLength: 2, maxLength: 240 }
+      required: [date, reason]
+    ContactMessageInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 2, maxLength: 120 }
+        email: { type: string, format: email }
+        subject: { type: string, minLength: 2, maxLength: 160 }
+        message: { type: string, minLength: 5, maxLength: 3000 }
+      required: [name, email, subject, message]

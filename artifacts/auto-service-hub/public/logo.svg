@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Auto Service Hub">
+  <rect width="160" height="160" rx="20" fill="#1c303c"/>
+  <path d="M83 28a31 31 0 0 0-39 39L24 87l49 49 20-20a31 31 0 0 0 39-39l-19 19-23-23 19-19a31 31 0 0 0-26-26Z" fill="none" stroke="#e96334" stroke-linecap="round" stroke-linejoin="round" stroke-width="9"/>
+  <circle cx="73" cy="97" r="7" fill="#f3eee4"/>
+</svg>

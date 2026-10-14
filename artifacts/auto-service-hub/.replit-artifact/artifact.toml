@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Auto Service & Detailing Hub"
+description = "An Albanian-language website for an auto repair and detailing shop, with online appointment booking, service information, a repair portfolio, customer reviews, and a private shop admin area."
+version = "1.0.0"
+id = "artifacts/auto-service-hub"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22202
+
+[services.development]
+run = "pnpm --filter @workspace/auto-service-hub run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/auto-service-hub", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/auto-service-hub/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22202"
+BASE_PATH = "/"
