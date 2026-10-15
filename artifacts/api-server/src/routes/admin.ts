@@ -133,7 +133,7 @@ router.get(
           .orderBy(asc(appointmentsTable.appointmentDate), asc(appointmentsTable.appointmentTime));
     const appointments = rows.map(({ appointment, serviceName }) => ({
       ...appointment,
-      serviceName: serviceName ?? appointment.customService ?? "Shërbim tjetër",
+      serviceName: serviceName ?? appointment.customService ?? "Andere Leistung",
     }));
     res.json(ListAdminAppointmentsResponse.parse(appointments));
   },
@@ -154,7 +154,7 @@ router.patch(
       return;
     }
     if (Object.keys(body.data).length === 0) {
-      res.status(400).json({ error: "Zgjidhni të paktën një ndryshim." });
+      res.status(400).json({ error: "Wählen Sie mindestens eine Änderung aus." });
       return;
     }
 
@@ -174,7 +174,7 @@ router.patch(
         .where(eq(appointmentsTable.id, params.data.id))
         .returning();
       if (!updated) {
-        res.status(404).json({ error: "Termini nuk u gjet." });
+        res.status(404).json({ error: "Termin nuk u gjet." });
         return;
       }
       const [joined] = await db
@@ -189,7 +189,7 @@ router.patch(
         )
         .where(eq(appointmentsTable.id, updated.id));
       if (!joined) {
-        res.status(404).json({ error: "Termini nuk u gjet." });
+        res.status(404).json({ error: "Termin nuk u gjet." });
         return;
       }
       res.json(
@@ -198,12 +198,12 @@ router.patch(
           serviceName:
             joined.serviceName ??
             joined.appointment.customService ??
-            "Shërbim tjetër",
+            "Andere Leistung",
         }),
       );
     } catch (error) {
       if (isUniqueViolation(error)) {
-        res.status(409).json({ error: "Ky orar është i zënë." });
+        res.status(409).json({ error: "Diese Uhrzeit ist bereits belegt." });
         return;
       }
       throw error;
@@ -220,11 +220,11 @@ router.get(
       res.status(400).json({ error: parsed.error.message });
       return;
     }
-    const status = parsed.data.status ?? "pending";
+    const status = parsed.data.status;
     const reviews = await db
       .select()
       .from(reviewsTable)
-      .where(eq(reviewsTable.status, status))
+      .where(status ? eq(reviewsTable.status, status) : undefined)
       .orderBy(desc(reviewsTable.createdAt));
     res.json(ListAdminReviewsResponse.parse(reviews));
   },
@@ -250,12 +250,28 @@ router.patch(
       .where(eq(reviewsTable.id, params.data.id))
       .returning();
     if (!review) {
-      res.status(404).json({ error: "Dëshmia nuk u gjet." });
+      res.status(404).json({ error: "Die Bewertung wurde nicht gefunden." });
       return;
     }
     res.json(ModerateReviewResponse.parse(review));
   },
 );
+
+router.delete('/admin/reviews/:id', requireAdmin, async (req, res): Promise<void> => {
+  const params = ModerateReviewParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: 'Ungültige Bewertung.' });
+    return;
+  }
+  const [deleted] = await db.delete(reviewsTable)
+    .where(eq(reviewsTable.id, params.data.id))
+    .returning({ id: reviewsTable.id });
+  if (!deleted) {
+    res.status(404).json({ error: 'Die Bewertung wurde nicht gefunden.' });
+    return;
+  }
+  res.sendStatus(204);
+});
 
 router.get(
   "/admin/blocked-slots",

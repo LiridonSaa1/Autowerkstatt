@@ -367,5 +367,17 @@ export async function customFetch<T = unknown>(
     throw new ApiError(response, errorData, requestInfo);
   }
 
+  // A development server can return the SPA HTML fallback for a missing API.
+  // Reject that response instead of exposing HTML as typed application data.
+  if (getMediaType(response.headers) === "text/html" &&
+      /\/api(?:\/|\?|$)/.test(requestInfo.url)) {
+    throw new ResponseParseError(
+      response,
+      await response.text(),
+      new Error("The API returned HTML. Check that the API server is running."),
+      requestInfo,
+    );
+  }
+
   return (await parseSuccessBody(response, responseType, requestInfo)) as T;
 }

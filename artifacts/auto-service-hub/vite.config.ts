@@ -65,6 +65,12 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    proxy: {
+      '/api': {
+        target: process.env.API_PROXY_TARGET || 'http://127.0.0.1:3001',
+        changeOrigin: true,
+      },
+    },
     port,
     strictPort: true,
     host: '0.0.0.0',

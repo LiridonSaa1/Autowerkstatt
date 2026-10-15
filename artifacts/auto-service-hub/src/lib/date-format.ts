@@ -9,7 +9,7 @@ export function formatCalendarDate(
   options: Intl.DateTimeFormatOptions = {},
 ): string {
   const date = new Date(`${calendarDateKey(value)}T12:00:00Z`);
-  return date.toLocaleDateString("sq-AL", {
+  return date.toLocaleDateString("de-DE", {
     timeZone: "Europe/Tirane",
     ...options,
   });

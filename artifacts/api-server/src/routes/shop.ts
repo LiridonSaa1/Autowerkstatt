@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import { readSettings } from './settings';
 import { and, asc, count, desc, eq, gte, lt, ne, sql } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import {
@@ -60,19 +62,8 @@ function isUniqueViolation(error: unknown): boolean {
   return value.code === "23505" || value.cause?.code === "23505";
 }
 
-router.get("/shop", (_req, res): void => {
-  const details = {
-    name: process.env.SHOP_NAME ?? "Auto Service & Detailing Hub",
-    tagline: "Kujdes i besueshëm për çdo kilometër.",
-    phone: process.env.SHOP_PHONE ?? "",
-    whatsapp: process.env.SHOP_WHATSAPP ?? "",
-    address: process.env.SHOP_ADDRESS ?? "",
-    city: process.env.SHOP_CITY ?? "",
-    emergencyPhone: process.env.SHOP_EMERGENCY_PHONE ?? "",
-    openingHours: process.env.SHOP_OPENING_HOURS ?? "",
-    mapUrl: process.env.SHOP_MAP_URL ?? "",
-  };
-  res.json(GetShopInfoResponse.parse(details));
+router.get("/shop", async (_req, res): Promise<void> => {
+  res.json(await readSettings());
 });
 
 router.get("/services", async (_req, res): Promise<void> => {
@@ -182,7 +173,7 @@ router.post("/appointments", async (req, res): Promise<void> => {
   const data = parsed.data;
   const date = calendarDate(data.appointmentDate);
   if (!appointmentTimes.includes(data.appointmentTime)) {
-    res.status(400).json({ error: "Ora e zgjedhur nuk është në dispozicion." });
+    res.status(400).json({ error: "Die gewählte Uhrzeit ist nicht verfügbar." });
     return;
   }
 
@@ -191,7 +182,7 @@ router.post("/appointments", async (req, res): Promise<void> => {
     .from(servicesTable)
     .where(eq(servicesTable.id, data.serviceId));
   if (!service && !data.customService?.trim()) {
-    res.status(400).json({ error: "Zgjidhni një shërbim ose përshkruani kërkesën." });
+    res.status(400).json({ error: "Wählen Sie eine Leistung oder beschreiben Sie Ihr Anliegen." });
     return;
   }
 
@@ -218,7 +209,7 @@ router.post("/appointments", async (req, res): Promise<void> => {
     .limit(1);
 
   if (blocked || existing || isSunday(date) || date < tiranaToday()) {
-    res.status(409).json({ error: "Ky termin nuk është më në dispozicion." });
+    res.status(409).json({ error: "Dieser Termin ist nicht mehr verfügbar." });
     return;
   }
 
@@ -248,7 +239,7 @@ router.post("/appointments", async (req, res): Promise<void> => {
     await db.insert(appointmentsTable).values(values);
   } catch (error) {
     if (isUniqueViolation(error)) {
-      res.status(409).json({ error: "Ky termin u rezervua nga dikush tjetër. Zgjidhni një orar tjetër." });
+      res.status(409).json({ error: "Dieser Termin wurde inzwischen gebucht. Wählen Sie eine andere Uhrzeit." });
       return;
     }
     throw error;
@@ -257,7 +248,7 @@ router.post("/appointments", async (req, res): Promise<void> => {
   res.status(201).json(
     CreateAppointmentResponse.parse({
       referenceCode,
-      message: "Kërkesa për termin u pranua. Servisi do t’ju kontaktojë për konfirmim.",
+      message: "Ihre Terminanfrage wurde angenommen. Die Werkstatt meldet sich zur Bestätigung.",
     }),
   );
 });
@@ -268,11 +259,15 @@ router.post("/reviews", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  if (parsed.data.comment.length > 150) {
+    res.status(400).json({ error: 'Ihre Erfahrung darf maximal 150 Zeichen enthalten.' });
+    return;
+  }
   const values = insertReviewSchema.parse({ ...parsed.data, status: "pending" });
   await db.insert(reviewsTable).values(values);
   res.status(201).json(
     CreateReviewResponse.parse({
-      message: "Dëshmia u dërgua dhe do të shfaqet pasi të shqyrtohet nga servisi.",
+      message: "Ihre Bewertung wurde eingereicht und erscheint nach Prüfung durch die Werkstatt.",
     }),
   );
 });
@@ -287,13 +282,15 @@ router.post("/contact", async (req, res): Promise<void> => {
   await db.insert(contactMessagesTable).values(values);
   res.status(201).json(
     CreateContactMessageResponse.parse({
-      message: "Mesazhi u pranua. Faleminderit që na kontaktuat.",
+      message: "Ihre Nachricht wurde empfangen. Vielen Dank für Ihre Kontaktaufnahme.",
     }),
   );
 });
 
 router.post("/portfolio", requireAdmin, async (req, res): Promise<void> => {
-  const parsed = CreatePortfolioItemBody.safeParse(req.body);
+  const parsed = CreatePortfolioItemBody.extend({
+    imageUrl: z.string().refine(value => /^\/api\/portfolio-images\/[a-f0-9-]+\.(jpg|png|webp)$/.test(value) || /^https?:\/\//.test(value) && z.string().url().safeParse(value).success, 'Bitte laden Sie ein Bild hoch oder verwenden Sie eine gültige Bild-URL.'),
+  }).safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;

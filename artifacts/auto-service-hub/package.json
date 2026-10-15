@@ -11,7 +11,7 @@
   },
   "devDependencies": {
     "@clerk/localizations": "^3.34.0",
-    "@clerk/react": "^6.31.9",
+    "@clerk/react": "^6.17.8",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.4",
     "@radix-ui/react-alert-dialog": "^1.1.7",
@@ -75,5 +75,13 @@
     "vite": "catalog:",
     "wouter": "^3.3.5",
     "zod": "catalog:"
+  },
+  "dependencies": {
+    "@fullcalendar/core": "^6.1.21",
+    "@fullcalendar/daygrid": "6",
+    "@fullcalendar/interaction": "6",
+    "@fullcalendar/react": "^6.1.21",
+    "@fullcalendar/timegrid": "6",
+    "@supabase/supabase-js": "^2.117.3"
   }
 }
