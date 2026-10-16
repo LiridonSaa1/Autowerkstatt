@@ -22,6 +22,7 @@ export interface PortfolioInput {
      * @maxLength 1000
      */
   description: string;
+  /** HTTP(S) image URL or a server-managed /api/portfolio-images/ path */
   imageUrl: string;
   /** @maxLength 120 */
   vehicleLabel: string;

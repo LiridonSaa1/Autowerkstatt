@@ -40,8 +40,9 @@ export const ListServicesResponseItem = zod.object({
   "name": zod.string(),
   "category": zod.string(),
   "description": zod.string(),
-  "priceLabel": zod.string(),
-  "durationMinutes": zod.number().int()
+  "priceLabel": zod.string().nullish(),
+  "durationMinutes": zod.number().int().nullish(),
+  "icon": zod.string().nullish()
 })
 export const ListServicesResponse = zod.array(ListServicesResponseItem)
 
@@ -81,7 +82,7 @@ export const CreatePortfolioItemBody = zod.object({
   "title": zod.string().min(createPortfolioItemBodyTitleMin).max(createPortfolioItemBodyTitleMax),
   "category": zod.string().min(createPortfolioItemBodyCategoryMin).max(createPortfolioItemBodyCategoryMax),
   "description": zod.string().min(createPortfolioItemBodyDescriptionMin).max(createPortfolioItemBodyDescriptionMax),
-  "imageUrl": zod.string().url(),
+  "imageUrl": zod.string().describe('HTTP(S) image URL or a server-managed /api/portfolio-images/ path'),
   "vehicleLabel": zod.string().max(createPortfolioItemBodyVehicleLabelMax)
 })
 

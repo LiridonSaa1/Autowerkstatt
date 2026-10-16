@@ -1,6 +1,7 @@
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import ReviewsCarousel from '@/components/reviews-carousel';
 import { QuoteRequestForm } from '@/components/quotes';
+import ServicesSection from '@/components/services-section';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -115,6 +116,7 @@ export default function HomePage() {
   const services = serviceQuery.data ?? [];
   const portfolio = portfolioQuery.data ?? [];
   const reviews = reviewQuery.data ?? [];
+  const averageReviewRating = reviews.length ? (reviews.reduce((total, review) => total + review.rating, 0) / reviews.length).toFixed(1) : '—';
   const availableDays = availabilityQuery.data ?? [];
   const selectedAvailability = availableDays.find((day) => calendarDateKey(day.date) === selectedDay);
   const filteredPortfolio = portfolioCategory === portfolioCategories[0]
@@ -276,7 +278,7 @@ export default function HomePage() {
               Faire Reparaturen, sorgfältige Fahrzeugpflege und klare Informationen vor Ihrer Entscheidung. Entdecken Sie unsere Leistungen und buchen Sie online.
             </p>
             <div className="reveal reveal-delay-3 mt-9 flex flex-wrap gap-3">
-              <a href="#rezervo" className="inline-flex items-center gap-3 bg-accent px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-foreground transition-transform hover:-translate-y-1" data-testid="link-book-hero">
+              <a href="#rezervo" className="inline-flex items-center gap-3 bg-accent px-6 py-4 text-[11px] font-bold uppercase tracking-wider text-white transition-transform hover:-translate-y-1" data-testid="link-book-hero">
                 Termin vereinbaren
                 <ArrowRight size={16} />
               </a>
@@ -300,14 +302,14 @@ export default function HomePage() {
 
       <section className="relative z-10 mx-auto -mt-1 grid max-w-[1340px] grid-cols-2 border-x border-b border-border bg-card md:grid-cols-4">
         {[
-          { icon: ShieldCheck, title: 'Transparente Arbeit', text: 'Sie wissen, was wir tun und warum.' },
-          { icon: Gauge, title: 'Praktische Lösungen', text: 'Passend zu Ihrem Fahrzeug und Bedarf.' },
-          { icon: Sparkles, title: 'Sorgfältige Fahrzeugpflege', text: 'Sauber bis ins Detail, innen und außen.' },
-          { icon: CalendarDays, title: 'Einfach Termine anfragen', text: 'Wählen Sie Tag und Uhrzeit online.' },
-        ].map(({ icon: Icon, title, text }) => (
-          <div key={title} className="flex min-h-[126px] items-center gap-4 border-b border-r border-border px-5 py-5 last:border-r-0 md:border-b-0 md:px-7">
-            <Icon className="shrink-0 text-accent" size={22} strokeWidth={1.8} />
-            <div>
+          { image: 'transparent-service.jpg', title: 'Transparente Arbeit', text: 'Sie wissen, was wir tun und warum.' },
+          { image: 'practical-solutions.jpg', title: 'Praktische Lösungen', text: 'Passend zu Ihrem Fahrzeug und Bedarf.' },
+          { image: 'vehicle-care-spray.jpg', title: 'Sorgfältige Fahrzeugpflege', text: 'Sauber bis ins Detail, innen und außen.' },
+          { image: 'online-booking.jpg', title: 'Einfach Termine anfragen', text: 'Wählen Sie Tag und Uhrzeit online.' },
+        ].map(({ image, title, text }) => (
+          <div key={title} className="flex min-h-[126px] flex-col items-start gap-3 border-b border-r border-border px-4 py-5 last:border-r-0 sm:flex-row sm:items-center md:border-b-0 md:px-5">
+            <img src={`${import.meta.env.BASE_URL}benefits/${image}`} alt="" width={1024} height={1024} loading="lazy" className="h-16 w-16 shrink-0 rounded-xl object-contain mix-blend-multiply lg:h-20 lg:w-20" />
+            <div className="min-w-0">
               <h2 className="text-xs font-bold uppercase tracking-wide">{title}</h2>
               <p className="mt-1.5 text-[11px] leading-5 text-muted-foreground">{text}</p>
             </div>
@@ -399,47 +401,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="sherbimet" className="surface-grid scroll-mt-16 px-5 py-24 md:px-10 md:py-32">
-        <div className="mx-auto max-w-[1340px]">
-          <div className="mb-12 flex flex-col justify-between gap-7 md:flex-row md:items-end">
-            <div>
-              <SectionEyebrow>Leistungen</SectionEyebrow>
-              <h2 className="mt-5 max-w-3xl font-display text-6xl font-bold uppercase leading-[.9] tracking-tight md:text-8xl">Bereit für jeden<br />Kilometer.</h2>
-            </div>
-            <p className="max-w-[360px] text-sm leading-7 text-muted-foreground">Von der regelmäßigen Wartung bis zur umfassenden Aufbereitung – wir hören zu und finden heraus, was Ihr Fahrzeug braucht.</p>
-          </div>
-          {serviceQuery.isLoading ? <LoadingCards count={4} /> : null}
-          {serviceQuery.isError && (
-            <div className="border border-destructive/30 bg-card p-6 text-sm" role="alert">
-              <p className="font-semibold">Die Leistungen konnten nicht geladen werden.</p>
-              <button type="button" onClick={() => void serviceQuery.refetch()} className="mt-3 text-accent underline">Erneut versuchen</button>
-            </div>
-          )}
-          {!serviceQuery.isLoading && !serviceQuery.isError && services.length === 0 && (
-            <div className="border border-dashed border-border bg-card/70 p-10 text-center text-sm text-muted-foreground">Unsere Leistungen erscheinen hier, sobald sie veröffentlicht sind.</div>
-          )}
-          {services.length > 0 && (
-            <div className="grid border-l border-t border-border sm:grid-cols-2 lg:grid-cols-3">
-              {services.map((service, index) => (
-                <article key={service.id} className="group relative min-h-[245px] border-b border-r border-border bg-card p-7 transition-colors hover:bg-primary hover:text-primary-foreground md:p-9" data-testid={`card-service-${service.id}`}>
-                  <span className="absolute right-7 top-7 font-display text-4xl font-bold text-accent/70">0{index + 1}</span>
-                  <span className="eyebrow text-muted-foreground group-hover:text-orange-200">{service.category}</span>
-                  <h3 className="mt-6 max-w-[75%] font-display text-3xl font-bold uppercase leading-none">{service.name}</h3>
-                  <p className="mt-4 max-w-[380px] text-xs leading-6 text-muted-foreground group-hover:text-white/65">{service.description}</p>
-                  <div className="mt-6 flex items-center justify-between border-t border-border/70 pt-4 text-[10px] font-bold uppercase tracking-wider group-hover:border-white/20">
-                    <span>{service.priceLabel}</span>
-                    <span className="flex items-center gap-1.5 text-muted-foreground group-hover:text-orange-200"><Clock3 size={13} /> {service.durationMinutes} min</span>
-                  </div>
-                  <a href="#rezervo" onClick={() => setSelectedServiceId(service.id)} className="mt-5 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-accent group-hover:text-orange-200" data-testid={`link-book-service-${service.id}`}>Diese Leistung buchen <ArrowRight size={13} /></a>
-                </article>
-              ))}
-            </div>
-          )}
-          <a href="#rezervo" className="mt-8 inline-flex items-center gap-3 text-xs font-bold uppercase tracking-wider text-accent hover:gap-5 transition-all">Passenden Termin finden <ArrowRight size={15} /></a>
-        </div>
-      </section>
+      <ServicesSection services={services} loading={serviceQuery.isLoading} error={serviceQuery.isError} onRetry={() => void serviceQuery.refetch()} onSelect={setSelectedServiceId} />
 
-      <section className="bg-[#ddd9cf] px-5 py-20 md:px-10 md:py-24">
+      <section className="bg-white px-5 py-20 md:px-10 md:py-24">
         <div className="mx-auto grid max-w-[1340px] gap-12 lg:grid-cols-[.7fr_1.3fr]">
           <div>
             <SectionEyebrow>So arbeiten wir</SectionEyebrow>
@@ -461,12 +425,20 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="vleresime" className="scroll-mt-16 px-5 py-24 md:px-10 md:py-32">
-        <div className="mx-auto max-w-[1340px]">
-          <div className="mb-10 flex flex-col justify-between gap-8 md:flex-row md:items-end">
-            <div><SectionEyebrow>Kundenstimmen</SectionEyebrow><h2 className="mt-5 font-display text-6xl font-bold uppercase leading-[.88] md:text-8xl">Vertrauen verbindet.</h2><p className="mt-6 max-w-xl text-sm leading-7 text-muted-foreground">Lesen Sie die Erfahrungen unserer Kunden. Neue Bewertungen werden nach Prüfung freigegeben.</p></div>
+      <section id="vleresime" className="relative w-full scroll-mt-16 overflow-hidden bg-[#faf8f5] px-5 py-20 md:px-10 md:py-24">
+        <div className="relative mx-auto w-full max-w-[1340px] bg-[radial-gradient(ellipse_at_70%_0%,rgba(255,176,107,.14),transparent_50%)]">
+          <div className="relative mb-2 flex min-h-[220px] flex-col justify-between gap-5 pb-4 lg:flex-row lg:items-end">
+            <div className="relative z-10 lg:max-w-[67%]">
+              <SectionEyebrow>Kundenstimmen</SectionEyebrow>
+              <div className="mt-5 flex flex-wrap items-center gap-5 lg:gap-6">
+                <h2 className="font-display text-5xl font-bold uppercase leading-[.9] md:text-7xl">Vertrauen<br /><span className="text-accent">verbindet.</span></h2>
+                <div className="border-l border-border pl-6"><p className="text-3xl font-bold tracking-tight">{averageReviewRating}<span className="ml-1 text-base text-muted-foreground/60"> / 5</span></p><div className="mt-3 flex gap-1 text-accent" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <Star key={index} size={16} className={index < Math.round(Number(averageReviewRating)) ? 'fill-current' : 'opacity-25'} />)}</div><p className="mt-3 text-xs text-muted-foreground">{reviews.length} veröffentlichte Bewertungen</p></div>
+              </div>
+              <p className="mt-4 max-w-md text-xs leading-6 text-muted-foreground">Lesen Sie die Erfahrungen unserer Kunden. Neue Bewertungen werden nach Prüfung freigegeben.</p>
+            </div>
+            <div className="relative h-44 overflow-hidden rounded-2xl lg:absolute lg:-right-[7%] lg:-top-6 lg:h-[260px] lg:w-[47%] lg:rounded-none lg:rounded-bl-[240px]" aria-hidden="true"><img src={`${import.meta.env.BASE_URL}customer-experience.png`} alt="" className="h-full w-full object-cover object-[70%_45%]" /><div className="absolute inset-0 bg-gradient-to-r from-[#faf8f5]/80 via-transparent to-transparent" /><div className="pointer-events-none absolute -left-12 top-0 hidden h-[115%] w-32 -rotate-[37deg] border-r border-white/70 bg-gradient-to-r from-orange-200/30 to-orange-500/65 lg:block" /></div>
             <Dialog open={reviewOpen} onOpenChange={(open) => { if (!createReview.isPending) { setReviewOpen(open); if (open) { setReviewError(''); setReviewSuccess(''); } } }}>
-              <DialogTrigger asChild><button className="inline-flex shrink-0 items-center justify-center gap-3 bg-accent px-6 py-4 text-xs font-bold uppercase tracking-wider text-accent-foreground" data-testid="button-open-review"><MessageCircle size={18} />Bewertung abgeben</button></DialogTrigger>
+              <DialogTrigger asChild><button className="relative z-10 inline-flex shrink-0 items-center justify-center gap-3 self-start rounded-xl bg-accent px-5 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-[0_8px_24px_-8px_rgba(255,94,30,.55)] transition-all hover:-translate-y-0.5 hover:bg-accent/90 lg:mb-4 lg:self-end" data-testid="button-open-review"><MessageCircle size={18} />Bewertung abgeben<ArrowRight size={16} /></button></DialogTrigger>
               <DialogContent className="max-w-2xl border-white/15 bg-primary p-6 text-white md:p-9">
                 <div><span className="eyebrow text-orange-300">Erfahrung teilen</span><DialogTitle className="mt-3 font-display text-3xl font-bold uppercase">Wie war Ihr Besuch?</DialogTitle><DialogDescription className="mt-3 text-sm text-white/70">Ihre Bewertung wird geprüft und nach Freigabe veröffentlicht.</DialogDescription></div>
                             <form className="mt-7 grid gap-4 sm:grid-cols-2" onSubmit={submitReview}>
@@ -495,10 +467,18 @@ export default function HomePage() {
             </Dialog>
           </div>
           {reviewSuccess && <p role="status" className="mb-6 rounded-lg border border-emerald-700/20 bg-emerald-700/5 p-4 text-sm text-emerald-800">{reviewSuccess}</p>}
-          {reviewQuery.isLoading && <div className="h-56 animate-pulse rounded-xl bg-muted" />}
+          {reviewQuery.isLoading && <div className="h-44 animate-pulse rounded-xl bg-muted" />}
           {reviewQuery.isError && <p className="text-sm text-destructive" role="alert">Die Bewertungen konnten nicht geladen werden. <button onClick={() => void reviewQuery.refetch()} className="underline">Erneut versuchen</button></p>}
-          {!reviewQuery.isLoading && !reviewQuery.isError && reviews.length === 0 && <div className="rounded-xl border border-border bg-card px-6 py-14 text-center"><MessageCircle size={30} className="mx-auto text-accent" /><p className="mt-4 text-sm text-muted-foreground">Es gibt noch keine veröffentlichten Bewertungen. Teilen Sie als Erster Ihre Erfahrung.</p></div>}
+          {!reviewQuery.isLoading && !reviewQuery.isError && reviews.length === 0 && <div className="rounded-xl border border-border bg-card px-6 py-8 text-center"><MessageCircle size={30} className="mx-auto text-accent" /><p className="mt-4 text-sm text-muted-foreground">Es gibt noch keine veröffentlichten Bewertungen. Teilen Sie als Erster Ihre Erfahrung.</p></div>}
           {reviews.length > 0 && <ReviewsCarousel reviews={reviews} />}
+          <div className="mt-6 grid grid-cols-2 gap-y-4 rounded-2xl border border-white bg-white/65 px-5 py-4 shadow-[0_5px_20px_-12px_rgba(34,45,51,.15)] backdrop-blur-sm lg:grid-cols-4">
+            {[
+              { icon: MessageCircle, value: String(reviews.length), label: 'Veröffentlichte Bewertungen' },
+              { icon: Star, value: `${averageReviewRating} / 5`, label: 'Durchschnittsbewertung' },
+              { icon: ShieldCheck, value: 'Persönlich geprüft', label: 'Vor der Veröffentlichung' },
+              { icon: Gauge, value: 'Alle Fahrzeugmarken', label: 'PKW, SUV, Transporter u.v.m.' },
+            ].map(({ icon: Icon, value, label }) => <div key={label} className="flex flex-col items-start gap-3 px-3 sm:flex-row sm:items-center lg:border-l lg:border-border lg:px-5 lg:first:border-l-0"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-orange-50 text-accent"><Icon size={19} /></span><div><p className="text-xs font-bold text-foreground">{value}</p><p className="mt-1 text-[11px] leading-5 text-muted-foreground">{label}</p></div></div>)}
+          </div>
         </div>
       </section>
 

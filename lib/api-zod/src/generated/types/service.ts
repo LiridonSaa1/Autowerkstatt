@@ -11,6 +11,10 @@ export interface Service {
   name: string;
   category: string;
   description: string;
-  priceLabel: string;
-  durationMinutes: number;
+  /** @nullable */
+  priceLabel?: string | null;
+  /** @nullable */
+  durationMinutes?: number | null;
+  /** @nullable */
+  icon?: string | null;
 }

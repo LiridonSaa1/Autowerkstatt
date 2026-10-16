@@ -7,8 +7,9 @@ export const servicesTable = pgTable("services", {
   name: text("name").notNull(),
   category: text("category").notNull(),
   description: text("description").notNull(),
-  priceLabel: text("price_label").notNull(),
-  durationMinutes: integer("duration_minutes").notNull(),
+  priceLabel: text("price_label"),
+  durationMinutes: integer("duration_minutes"),
+  icon: text("icon"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

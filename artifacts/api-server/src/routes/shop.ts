@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { readSettings } from './settings';
+import { seedDefaultServices } from './services';
 import { and, asc, count, desc, eq, gte, lt, ne, sql } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import {
@@ -67,10 +68,17 @@ router.get("/shop", async (_req, res): Promise<void> => {
 });
 
 router.get("/services", async (_req, res): Promise<void> => {
-  const services = await db
+  let services = await db
     .select()
     .from(servicesTable)
     .orderBy(asc(servicesTable.name));
+  if (services.length === 0) {
+    await seedDefaultServices();
+    services = await db
+      .select()
+      .from(servicesTable)
+      .orderBy(asc(servicesTable.name));
+  }
   res.json(ListServicesResponse.parse(services));
 });
 

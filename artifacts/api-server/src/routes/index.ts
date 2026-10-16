@@ -1,3 +1,4 @@
+import reviewVehiclesRouter from './review-vehicles';
 import servicesRouter from './services';
 import portfolioImagesRouter from './portfolio-images';
 import integrationsRouter from './integrations';
@@ -12,6 +13,7 @@ import adminRouter from "./admin";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(reviewVehiclesRouter);
 router.use(servicesRouter);
 router.use(portfolioImagesRouter);
 router.use(shopRouter);

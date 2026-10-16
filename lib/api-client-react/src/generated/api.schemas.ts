@@ -30,8 +30,12 @@ export interface Service {
   name: string;
   category: string;
   description: string;
-  priceLabel: string;
-  durationMinutes: number;
+  /** @nullable */
+  priceLabel?: string | null;
+  /** @nullable */
+  durationMinutes?: number | null;
+  /** @nullable */
+  icon?: string | null;
 }
 
 export interface PortfolioItem {
@@ -61,6 +65,7 @@ export interface PortfolioInput {
      * @maxLength 1000
      */
   description: string;
+  /** HTTP(S) image URL or a server-managed /api/portfolio-images/ path */
   imageUrl: string;
   /** @maxLength 120 */
   vehicleLabel: string;

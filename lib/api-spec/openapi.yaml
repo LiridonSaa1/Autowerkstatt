@@ -421,9 +421,10 @@ components:
         name: { type: string }
         category: { type: string }
         description: { type: string }
-        priceLabel: { type: string }
-        durationMinutes: { type: integer }
-      required: [id, name, category, description, priceLabel, durationMinutes]
+        priceLabel: { type: ["string", "null"] }
+        durationMinutes: { type: ["integer", "null"] }
+        icon: { type: ["string", "null"] }
+      required: [id, name, category, description]
     PortfolioItem:
       type: object
       properties:
