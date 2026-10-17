@@ -44,6 +44,28 @@ export function resolveServiceIconKey(icon?: string | null, name?: string): stri
   return 'technical-repairs';
 }
 
+const serviceBadgeFiles: Record<string, string> = {
+  'electrical-system': 'battery.png',
+  'engine-diagnostics': 'engine.png',
+  'oil-filters': 'oil.png',
+  'system-service': 'tools.png',
+  'technical-repairs': 'lift.png',
+  'tires-wheels': 'tires.png',
+};
+
+export function ServiceBadge({ icon, name }: { icon?: string | null; name: string }) {
+  const key = /electrical|elektronik|batterie/i.test(name)
+    ? 'electrical-system'
+    : resolveServiceIconKey(icon, name);
+  const file = serviceBadgeFiles[key];
+  if (!file) return <ServiceIcon icon={icon} name={name} size={40} />;
+  return (
+    <span className="inline-flex h-10 w-10 shrink-0 overflow-hidden rounded-full border-2 border-white bg-accent shadow-sm">
+      <img src={`${import.meta.env.BASE_URL}service-badges/${file}`} alt="" aria-hidden="true" width={40} height={40} className="h-full w-full scale-[1.08] object-cover [filter:hue-rotate(18deg)_saturate(.95)]" />
+    </span>
+  );
+}
+
 export const ICON_IMAGE_MAP: Record<string, string> = {
   'technical-repairs': '/service-icons/technical-repairs.png',
   'engine-diagnostics': '/service-icons/engine-diagnostics.png',

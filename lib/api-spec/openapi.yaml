@@ -366,6 +366,41 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "404":
           $ref: "#/components/responses/NotFound"
+  /admin/booking-schedule:
+    get:
+      operationId: getBookingSchedule
+      tags: [admin]
+      summary: Read weekly working hours, holidays and booking limits
+      responses:
+        "200":
+          description: Booking schedule in the Europe/Berlin timezone
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingSchedule"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      operationId: updateBookingSchedule
+      tags: [admin]
+      summary: Save working hours, breaks, holidays and booking limits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookingSchedule"
+      responses:
+        "200":
+          description: Saved booking schedule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingSchedule"
+        "400":
+          description: Invalid working hours, breaks or date range
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 components:
   parameters:
     Id:
@@ -481,9 +516,42 @@ components:
           type: string
           enum: [approved, rejected]
       required: [status]
+    BookingSchedule:
+      type: object
+      required: [weekly, intervalMinutes, advanceDays, firstDate, lastDate, holidays]
+      properties:
+        weekly:
+          type: array
+          description: Seven days ordered Monday through Sunday
+          minItems: 7
+          maxItems: 7
+          items:
+            type: object
+            required: [enabled, start, end, breakStart, breakEnd]
+            properties:
+              enabled: { type: boolean }
+              start: { type: string, example: "09:00" }
+              end: { type: string, example: "17:00" }
+              breakStart: { type: string, example: "12:00" }
+              breakEnd: { type: string, example: "13:00" }
+        intervalMinutes: { type: integer, minimum: 15, maximum: 240 }
+        advanceDays: { type: integer, minimum: 1, maximum: 730 }
+        firstDate: { type: string, description: "First bookable date (YYYY-MM-DD), or empty for no lower limit" }
+        lastDate: { type: string, description: "Last bookable date (YYYY-MM-DD), or empty for no upper limit" }
+        holidays:
+          type: array
+          maxItems: 200
+          items:
+            type: object
+            required: [from, to, label]
+            properties:
+              from: { type: string, format: date }
+              to: { type: string, format: date }
+              label: { type: string, minLength: 1, maxLength: 120 }
     DayAvailability:
       type: object
       properties:
+        reason: { type: ["string", "null"], description: Public holiday name or explanation for an unavailable day }
         date: { type: string, format: date }
         open: { type: boolean }
         slots:

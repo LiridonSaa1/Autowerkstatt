@@ -1,9 +1,8 @@
 import ServicesPanel from './services-panel';
-import PortfolioCreate from '@/components/portfolio-create';
 import DeleteConfirmation from '@/components/delete-confirmation';
 import IntegrationsPanel, { IntegrationUnlock } from './integrations-panel';
 import BookingCalendar from './booking-calendar';
-import { AdminQuotes } from '@/components/quotes';
+import BookingSchedulePanel from './booking-schedule-panel';
 import SettingsPanel from './settings-panel';
 import ContactReply from './contact-reply';
 import { type FormEvent, type ReactNode, useEffect, useMemo, useState } from 'react';
@@ -22,7 +21,6 @@ import {
   MessageSquareText,
   Plus,
   ShieldCheck,
-  Send,
   Search,
   Star,
   Settings,
@@ -55,7 +53,7 @@ import {
 } from '@workspace/api-client-react';
 import { calendarDateKey, formatCalendarDate } from '@/lib/date-format';
 
-type AdminTab = 'services' | 'integrations' | 'settings' | 'quotes' | 'appointments' | 'reviews' | 'availability' | 'portfolio' | 'messages';
+type AdminTab = 'services' | 'integrations' | 'settings' | 'appointments' | 'reviews' | 'availability' | 'messages';
 type AppointmentStatusFilter = '' | 'pending' | 'approved' | 'cancelled' | 'completed';
 
 const statusText: Record<string, string> = {
@@ -101,13 +99,11 @@ function AdminPage() {
     query: { queryKey: getListAdminContactMessagesQueryKey() },
   });
   const blockedQuery = useListBlockedSlots();
-  const portfolioQuery = useListPortfolio();
   const updateAppointment = useUpdateAppointment();
   const moderateReview = useModerateReview();
   const createBlockedSlot = useCreateBlockedSlot();
   const deleteBlockedSlot = useDeleteBlockedSlot();
 
-  const deletePortfolio = useDeletePortfolioItem();
   const [blockSuccess, setBlockSuccess] = useState('');
   const [lastBlockForm, setLastBlockForm] = useState<'day' | 'time' | null>(null);
   const [portfolioSuccess, setPortfolioSuccess] = useState('');
@@ -225,31 +221,40 @@ function AdminPage() {
   };
 
   return (
-    <main className="min-h-[100dvh] bg-background text-foreground md:pl-60"><aside className="border-b border-sidebar-border bg-sidebar text-sidebar-foreground md:fixed md:inset-y-0 md:left-0 md:z-30 md:flex md:w-60 md:flex-col md:overflow-y-auto">
-<div className="flex h-[76px] shrink-0 items-center gap-3 border-b border-sidebar-border px-5"><span className="grid h-10 w-10 place-items-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground"><Wrench size={21}/></span><div><p className="font-display text-xl font-bold uppercase">Auto Service Hub</p><p className="mt-1 text-[9px] uppercase tracking-widest text-sidebar-foreground/65">Verwaltungsbereich</p></div></div>
-              <nav aria-label="Administrationsmenü" className="grid gap-1 px-3 py-5">
-                <p className="px-3 pb-3 pt-2 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/50">VERWALTUNG</p>
+    <main className="admin-page min-h-[100dvh] min-w-0 bg-background text-foreground lg:pl-60"><aside className="border-b border-sidebar-border bg-sidebar text-sidebar-foreground lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex lg:w-60 lg:flex-col lg:overflow-y-auto">
+<div className="flex h-[76px] shrink-0 items-center justify-between border-b border-sidebar-border px-5">
+  <Link href="/" className="flex items-center gap-3 py-1 transition-opacity hover:opacity-90" aria-label="Zur Startseite">
+    <img
+      src={`${import.meta.env.BASE_URL}service-car-logo-light.png`}
+      alt="Service Car"
+      width={817}
+      height={273}
+      className="h-10 w-auto object-contain"
+    />
+  </Link>
+  <span className="rounded bg-accent/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accent">Admin</span>
+</div>
+              <nav aria-label="Administrationsmenü" className="flex gap-2 overflow-x-auto px-3 py-3 lg:grid lg:overflow-visible lg:py-5">
+                <p className="hidden px-3 pb-3 pt-2 lg:block text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/50">VERWALTUNG</p>
                 {[
                   { id: 'appointments' as const, label: 'Termine', icon: CalendarDays },
                   { id: 'services' as const, label: 'Leistungen', icon: Wrench },
-                  { id: 'quotes' as const, label: 'Angebote', icon: Send },
                   { id: 'reviews' as const, label: 'Bewertungen', icon: MessageSquareText },
                   { id: 'availability' as const, label: 'Verfügbarkeit', icon: Clock3 },
-                  { id: 'portfolio' as const, label: 'Galerie', icon: ImagePlus },
                   { id: 'messages' as const, label: 'Nachrichten', icon: MessageSquareText },
                   { id: 'integrations' as const, label: 'API-Integrationen', icon: ShieldCheck },
                   { id: 'settings' as const, label: 'Einstellungen', icon: Settings },
-                ].map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => { if (id === 'integrations') { setIntegrationGrant(null); setIntegrationPrompt(true); } else { setIntegrationGrant(null); setTab(id); } }} aria-current={tab === id ? 'page' : undefined} className={`flex w-full items-center gap-3 rounded-lg border-l-2 px-3 py-3 text-left text-xs font-bold transition-colors ${tab === id ? 'border-sidebar-primary bg-sidebar-primary text-white' : 'border-transparent text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid={`tab-${id}`}><Icon size={17} />{label}</button>)}
+                ].map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => { if (id === 'integrations') { setIntegrationGrant(null); setIntegrationPrompt(true); } else { setIntegrationGrant(null); setTab(id); } }} aria-current={tab === id ? 'page' : undefined} className={`flex w-auto shrink-0 items-center gap-3 whitespace-nowrap rounded-lg border-l-2 lg:w-full px-3 py-3 text-left text-xs font-bold transition-colors ${tab === id ? 'border-sidebar-primary bg-sidebar-primary text-white' : 'border-transparent text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'}`} data-testid={`tab-${id}`}><Icon size={17} />{label}</button>)}
               </nav>
-<div className="mt-auto border-t border-sidebar-border p-4"><Link href="/" className="flex items-center gap-3 px-3 py-3 text-xs text-sidebar-foreground/65"><ArrowLeft size={16}/>Zur Website</Link><button onClick={async () => { const result = await supabase?.auth.signOut(); if(result?.error) { setActionError('Die Abmeldung ist fehlgeschlagen.'); return; } queryClient.clear(); window.location.assign(import.meta.env.BASE_URL + 'sign-in'); }} className="flex w-full items-center gap-3 px-3 py-3 text-xs text-sidebar-foreground/65"><LogIn size={16}/>Abmelden</button></div></aside>
+<div className="mt-auto flex border-t border-sidebar-border px-3 py-1 lg:block lg:p-4"><Link href="/" className="flex items-center gap-3 px-3 py-3 text-xs text-sidebar-foreground/65"><ArrowLeft size={16}/>Zur Website</Link><button onClick={async () => { const result = await supabase?.auth.signOut(); if(result?.error) { setActionError('Die Abmeldung ist fehlgeschlagen.'); return; } queryClient.clear(); window.location.assign(import.meta.env.BASE_URL + 'sign-in'); }} className="flex items-center gap-3 px-3 py-3 text-xs text-sidebar-foreground/65"><LogIn size={16}/>Abmelden</button></div></aside>
 <header className="flex h-[76px] items-center justify-between border-b border-border bg-card px-5 lg:px-8"><span className="text-sm text-muted-foreground">Verwaltung</span><span className="flex items-center gap-2 text-xs text-muted-foreground"><ShieldCheck size={17} className="text-accent"/>Administrator</span></header>
 
-      <div className="min-w-0 px-5 py-7 lg:px-8">
-        <div className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+      <div className="min-w-0 px-3 py-5 sm:px-5 sm:py-7 lg:px-8">
+        <div className="flex flex-col justify-between gap-5 xl:flex-row md:items-end">
           <div>
             
             <h1 className="font-display text-4xl font-bold uppercase tracking-tight">Verwaltung</h1>
-            <p className="mt-4 text-sm text-muted-foreground">Verwalten Sie Termine, Bewertungen und Ihre Galerie.</p>
+            <p className="mt-4 text-sm text-muted-foreground">Verwalten Sie Termine, Bewertungen und Ihre Website.</p>
           </div>
           <p className="max-w-sm border-l-2 border-accent pl-4 text-xs leading-5 text-muted-foreground">Willkommen in der Verwaltung Ihrer Werkstatt.</p>
         </div>
@@ -275,7 +280,7 @@ function AdminPage() {
           </section>
         ) : (
           <>
-            <div className="mt-9 grid grid-cols-2 gap-3 lg:grid-cols-5">
+            <div className="mt-9 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
               {[
                 { label: 'Offene Terminanfragen', value: summaryQuery.data?.pendingAppointments ?? 0, icon: CalendarDays },
                 { label: 'Termine insgesamt', value: summaryQuery.data?.totalAppointments ?? 0, icon: Wrench },
@@ -316,7 +321,7 @@ function AdminPage() {
                   {selectedAppointmentId !== null && <div className="flex items-center justify-between border-t border-border px-5 py-3"><h3 className="text-sm font-bold">Buchungsdetails</h3><button type="button" onClick={() => setSelectedAppointmentId(null)} aria-label="Details schließen"><X size={18} /></button></div>}
                   {selectedAppointmentId !== null && (
                     <div className="overflow-x-auto">
-                      <table className="w-full min-w-[900px] text-left">
+                      <table className="admin-booking-table w-full text-left lg:min-w-[900px]">
                         <thead className="bg-muted/55 text-[9px] uppercase tracking-wider text-muted-foreground"><tr><th className="px-5 py-3">Kunde / Fahrzeug</th><th className="px-5 py-3">Leistung</th><th className="px-5 py-3">Termin</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Aktion</th></tr></thead>
                         <tbody className="divide-y divide-border">
                           {appointmentsQuery.data?.filter((appointment) => appointment.id === selectedAppointmentId).map((appointment) => (
@@ -362,7 +367,7 @@ function AdminPage() {
                   ) : (
                     <div className="divide-y divide-border">
                       {contactMessagesQuery.data?.map((message) => (
-                        <article key={message.id} className="flex flex-col justify-between gap-4 p-5 md:flex-row" data-testid={`row-contact-message-${message.id}`}>
+                        <article key={message.id} className="flex flex-col justify-between gap-4 p-5 xl:flex-row" data-testid={`row-contact-message-${message.id}`}>
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                               <h3 className="text-sm font-bold">{message.subject}</h3>
@@ -381,7 +386,6 @@ function AdminPage() {
                 </div>
               )}
 
-              {tab === 'quotes' && <AdminQuotes />}
               {tab === 'reviews' && (
                 <div className="space-y-6">
                   <div className="flex flex-col gap-5 rounded-2xl border border-border bg-card p-6 shadow-sm sm:flex-row sm:items-center">
@@ -416,43 +420,9 @@ function AdminPage() {
                   </div></div>
                 </div>
               )}
-              {tab === 'availability' && (
-                <div className="mt-6 grid gap-5 xl:grid-cols-[.8fr_1.2fr]">
-                  <div className="grid gap-5">
-                    <form onSubmit={submitBlockedDay} className="border border-border bg-card p-5">
-                      <span className="eyebrow text-accent">Ganzer Tag</span><h2 className="mt-2 font-display text-2xl font-bold uppercase">Tag sperren</h2>
-                      <div className="mt-5 grid gap-4">
-                        <Field label="Datum"><input required type="date" name="blockedDate" className="h-11 border border-border bg-background px-3 text-sm text-foreground" data-testid="input-block-day-date" /></Field>
-                        <Field label="Grund"><input required minLength={2} maxLength={240} name="blockedReason" placeholder="z. B. Betriebsurlaub" className="h-11 border border-border bg-background px-3 text-sm" data-testid="input-block-day-reason" /></Field>
-                        <button type="submit" disabled={createBlockedSlot.isPending} className="inline-flex h-10 items-center justify-center gap-2 bg-primary text-xs font-bold uppercase text-primary-foreground disabled:opacity-50" data-testid="button-block-day"><span aria-hidden="true">{createBlockedSlot.isPending && lastBlockForm === 'day' ? <LoaderCircle size={14} className="animate-spin" /> : <Plus size={14} />}</span><span>{createBlockedSlot.isPending && lastBlockForm === 'day' ? 'Wird gespeichert…' : 'Tag sperren'}</span></button>
-                        {lastBlockForm === 'day' && (actionError || blockSuccess) && <p role={actionError ? 'alert' : 'status'} className={`rounded-lg border p-3 text-xs leading-5 ${actionError ? 'border-destructive/30 text-destructive' : 'border-emerald-700/20 bg-emerald-700/5 text-emerald-800'}`}>{actionError || blockSuccess}</p>}
-                      </div>
-                    </form>
-                    <form onSubmit={submitBlockedTime} className="border border-border bg-card p-5">
-                      <span className="eyebrow text-accent">Einzelne Uhrzeit</span><h2 className="mt-2 font-display text-2xl font-bold uppercase">Uhrzeit sperren</h2>
-                      <div className="mt-5 grid gap-4">
-                        <Field label="Datum"><input required type="date" name="blockedTimeDate" className="h-11 border border-border bg-background px-3 text-sm" data-testid="input-block-time-date" /></Field>
-                        <Field label="Uhrzeit"><input required type="time" name="blockedTime" className="h-11 border border-border bg-background px-3 text-sm" data-testid="input-block-time-time" /></Field>
-                        <Field label="Grund"><input required minLength={2} maxLength={240} name="blockedTimeReason" className="h-11 border border-border bg-background px-3 text-sm" data-testid="input-block-time-reason" /></Field>
-                        <button type="submit" disabled={createBlockedSlot.isPending} className="inline-flex h-10 items-center justify-center gap-2 border border-primary text-xs font-bold uppercase text-primary disabled:opacity-50" data-testid="button-block-time"><span aria-hidden="true">{createBlockedSlot.isPending && lastBlockForm === 'time' ? <LoaderCircle size={14} className="animate-spin" /> : <Plus size={14} />}</span><span>{createBlockedSlot.isPending && lastBlockForm === 'time' ? 'Wird gespeichert…' : 'Uhrzeit sperren'}</span></button>
-                        {lastBlockForm === 'time' && (actionError || blockSuccess) && <p role={actionError ? 'alert' : 'status'} className={`rounded-lg border p-3 text-xs leading-5 ${actionError ? 'border-destructive/30 text-destructive' : 'border-emerald-700/20 bg-emerald-700/5 text-emerald-800'}`}>{actionError || blockSuccess}</p>}
-                      </div>
-                    </form>
-                  </div>
-                  <div className="border border-border bg-card">
-                    <div className="border-b border-border p-5"><h2 className="font-display text-2xl font-bold uppercase">Gesperrte Tage und Uhrzeiten</h2><p className="mt-1 text-xs text-muted-foreground">Entfernen Sie eine Sperre, um wieder Buchungen zu ermöglichen.</p></div>
-                    {(blockedQuery.data ?? []).length === 0 ? <div className="px-5 py-12 text-center text-sm text-muted-foreground">Es sind keine Tage oder Uhrzeiten gesperrt.</div> : <div className="divide-y divide-border">{blockedQuery.data?.map((slot) => <div key={slot.id} className="flex items-center justify-between gap-4 p-4" data-testid={`row-blocked-slot-${slot.id}`}><div><p className="text-xs font-bold">{formatCalendarDate(slot.date, { day: 'numeric', month: 'long', year: 'numeric' })}{slot.time && <span className="ml-2 text-accent">{slot.time}</span>}</p><p className="mt-1 text-[10px] text-muted-foreground">{slot.reason}</p></div><DeleteConfirmation title="Sperre löschen?" description="Die Sperre wird entfernt. Dieser Tag oder diese Uhrzeit ist anschließend wieder für Buchungen verfügbar." itemLabel={`${formatCalendarDate(slot.date, { day: 'numeric', month: 'long', year: 'numeric' })}${slot.time ? ` · ${slot.time} Uhr` : ' · Ganzer Tag'} — ${slot.reason}`} onConfirm={async () => { await deleteBlockedSlot.mutateAsync({ id: slot.id }); invalidateAdmin(); }}><button type="button" disabled={deleteBlockedSlot.isPending} className="grid h-9 w-9 shrink-0 place-items-center border border-border text-muted-foreground hover:border-destructive hover:text-destructive disabled:opacity-50" aria-label={`Sperre entfernen ${slot.date}`} data-testid={`button-delete-block-${slot.id}`}><Trash2 size={15} /></button></DeleteConfirmation></div>)}</div>}
-                  </div>
-                </div>
-              )}
+              {tab === 'availability' && <div className="mt-6"><BookingSchedulePanel /></div>}
 
-              {tab === 'portfolio' && (
-                <div className="mt-6">
-                  <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><h2 className="font-display text-2xl font-bold uppercase">Arbeitsgalerie</h2><p className="mt-1 text-xs text-muted-foreground">Zeigen Sie Ihren Besuchern Beispiele abgeschlossener Arbeiten.</p></div><PortfolioCreate onCreated={() => { setPortfolioSuccess('Die Arbeit wurde zur Galerie hinzugefügt.'); invalidateAdmin(); }} /></div>
 
-                  {portfolioQuery.isLoading ? <div className="grid gap-4 md:grid-cols-3">{[1, 2, 3].map((item) => <div key={item} className="h-56 animate-pulse bg-muted" />)}</div> : portfolioQuery.isError ? <div className="border border-destructive/30 bg-card p-6 text-sm text-destructive">Die Galerie konnte nicht geladen werden. <button type="button" onClick={() => void portfolioQuery.refetch()} className="underline">Erneut versuchen</button></div> : (portfolioQuery.data ?? []).length === 0 ? <div className="border border-dashed border-border bg-card p-12 text-center"><ImagePlus className="mx-auto text-muted-foreground/50" /><p className="mt-3 text-sm font-semibold">Die Galerie ist noch leer.</p><p className="mt-1 text-xs text-muted-foreground">Fügen Sie Ihre erste abgeschlossene Arbeit hinzu.</p></div> : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{portfolioQuery.data?.map((item) => <article key={item.id} className="group overflow-hidden border border-border bg-card" data-testid={`card-admin-work-${item.id}`}><div className="relative aspect-[4/3] bg-muted">{item.imageUrl ? <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-muted-foreground/50"><ImagePlus /></div>}<DeleteConfirmation title="Arbeit löschen?" description="Diese Arbeit wird aus der Galerie entfernt und nicht mehr auf der Website angezeigt." itemLabel={item.title} onConfirm={async () => { await deletePortfolio.mutateAsync({ id: item.id }); invalidateAdmin(); }}><button type="button" disabled={deletePortfolio.isPending} className="absolute right-3 top-3 grid h-9 w-9 place-items-center bg-card/90 text-destructive shadow-sm" aria-label={`Arbeit löschen ${item.title}`} data-testid={`button-delete-work-${item.id}`}><Trash2 size={15} /></button></DeleteConfirmation></div><div className="p-4"><span className="eyebrow text-accent">{item.category}</span><h3 className="mt-2 font-display text-xl font-bold uppercase">{item.title}</h3><p className="mt-1 text-xs text-muted-foreground">{item.vehicleLabel}</p><p className="mt-3 line-clamp-3 text-xs leading-5 text-muted-foreground">{item.description}</p></div></article>)}</div>}
-                </div>
-              )}
               </div>
             </section>
           </>

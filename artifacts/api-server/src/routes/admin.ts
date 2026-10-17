@@ -27,6 +27,10 @@ import {
   servicesTable,
 } from "@workspace/db";
 import { requireAdmin } from "../middlewares/requireAdmin";
+import { readSettings } from "./settings";
+import { sendEmail } from "../lib/send-email";
+import { renderCustomerAppointmentEmail } from "../lib/email-templates";
+import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
 
@@ -133,7 +137,7 @@ router.get(
           .orderBy(asc(appointmentsTable.appointmentDate), asc(appointmentsTable.appointmentTime));
     const appointments = rows.map(({ appointment, serviceName }) => ({
       ...appointment,
-      serviceName: serviceName ?? appointment.customService ?? "Andere Leistung",
+      serviceName: appointment.customService ?? serviceName ?? "Andere Leistung",
     }));
     res.json(ListAdminAppointmentsResponse.parse(appointments));
   },
@@ -192,6 +196,48 @@ router.patch(
         res.status(404).json({ error: "Termin nuk u gjet." });
         return;
       }
+
+      if (body.data.status === "approved") {
+        (async () => {
+          try {
+            const shop = await readSettings();
+            const serviceName =
+              joined.serviceName ??
+              joined.appointment.customService ??
+              "Werkstattservice";
+            const vehicleText = `${joined.appointment.vehicleMake} ${joined.appointment.vehicleModel}, ${joined.appointment.vehicleYear}`;
+            const customerHtml = renderCustomerAppointmentEmail({
+              customerName: joined.appointment.customerName,
+              email: joined.appointment.email,
+              phone: joined.appointment.phone,
+              referenceCode: joined.appointment.referenceCode,
+              date: joined.appointment.appointmentDate,
+              time: joined.appointment.appointmentTime,
+              service: serviceName,
+              vehicle: vehicleText,
+              licensePlate: joined.appointment.licensePlate,
+              vin: joined.appointment.vin,
+              notes: joined.appointment.notes,
+              business: shop,
+              isConfirmed: true,
+            });
+
+            await sendEmail({
+              name: joined.appointment.customerName,
+              email: joined.appointment.email,
+              subject: `Ihr Termin ist bestätigt! · ${joined.appointment.referenceCode} · ${shop.name}`,
+              message: `Hallo ${joined.appointment.customerName},\n\nIhr Termin (${joined.appointment.referenceCode}) am ${joined.appointment.appointmentDate} um ${joined.appointment.appointmentTime} Uhr wurde verbindlich bestätigt.\n\nFahrzeug: ${vehicleText}\nLeistung: ${serviceName}\n\nWir freuen uns auf Ihren Besuch!\n\n${shop.name}\n${shop.phone || ""}`,
+              html: customerHtml,
+              senderName: shop.name,
+              fallbackEmail: shop.email,
+              replyTo: shop.email ? { name: shop.name, email: shop.email } : undefined,
+            });
+          } catch (mailErr) {
+            logger.error({ err: mailErr, id: joined.appointment.id }, "Could not send appointment confirmation update email");
+          }
+        })();
+      }
+
       res.json(
         UpdateAppointmentResponse.parse({
           ...joined.appointment,

@@ -1,8 +1,9 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { Router, type RequestHandler } from 'express';
+import { Router, type RequestHandler, type ErrorRequestHandler } from 'express';
 import { z } from 'zod/v4';
 import { requireAdmin } from '../middlewares/requireAdmin';
-import { readIntegrations, saveIntegrations } from '../lib/integrations';
+import { readIntegrations, saveIntegrations, IntegrationDecryptionError } from '../lib/integrations';
+import { integrationTestError } from '../lib/integration-test-error';
 const router = Router();
 const grants = new Map<string, { session: string; expires: number }>();
 const attempts = new Map<string, { count: number; until: number }>();
@@ -31,9 +32,9 @@ const requireUnlock: RequestHandler = (req, res, next) => {
 };
 router.use('/admin/integrations', requireUnlock);
 router.post('/admin/integrations/lock', (req, res) => { grants.delete(String(req.headers['x-integrations-token'] || '')); res.json({ locked: true }); });
-const secretFields = ['resendKey', 'supabaseKey', 'supabaseServiceKey', 'twilioToken'] as const;
+const secretFields = ['brevoKey', 'supabaseKey', 'supabaseServiceKey', 'twilioToken'] as const;
 const schema = z.object({
-  resendKey: z.string().trim().max(1000), resendFrom: z.union([z.literal(''), z.email()]),
+  brevoKey: z.string().trim().max(1000), brevoFrom: z.union([z.literal(''), z.email()]),
   supabaseUrl: z.union([z.literal(''), z.url().refine(value => /^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(value), 'Verwenden Sie die HTTPS-URL Ihres Supabase-Projekts.')]),
   supabaseKey: z.string().trim().max(3000), supabaseServiceKey: z.string().trim().max(3000),
   twilioSid: z.union([z.literal(''), z.string().regex(/^AC[a-fA-F0-9]{32}$/)]), twilioToken: z.string().trim().max(1000),
@@ -41,7 +42,7 @@ const schema = z.object({
 });
 router.get('/admin/integrations', async (_req, res) => {
   const config = await readIntegrations();
-  res.json({ ...config, resendKey: '', twilioToken: '', configured: Object.fromEntries(secretFields.map(field => [field, Boolean(config[field])])) });
+  res.json({ ...config, brevoKey: '', twilioToken: '', configured: Object.fromEntries(secretFields.map(field => [field, Boolean(config[field])])) });
 });
 router.put('/admin/integrations', async (req, res) => {
   const parsed = schema.safeParse(req.body);
@@ -52,10 +53,10 @@ router.put('/admin/integrations', async (req, res) => {
 });
 router.post('/admin/integrations/test/:provider', async (req, res) => {
   const config = await readIntegrations(); let url: string; let headers: Record<string, string>;
-  if (req.params.provider === 'resend') {
-    if (!config.resendKey) { res.status(400).json({ error: 'Speichern Sie den Resend-Schlüssel.' }); return; }
-    // Validation endpoint does not send an email; sending-only keys may lack permission.
-    url = 'https://api.resend.com/domains'; headers = { Authorization: `Bearer ${config.resendKey}` };
+  if (req.params.provider === 'brevo') {
+    if (!config.brevoKey) { res.status(400).json({ error: 'Speichern Sie den Brevo-Schlüssel.' }); return; }
+    // Account lookup verifies authentication without sending an email.
+    url = 'https://api.brevo.com/v3/account'; headers = { 'api-key': config.brevoKey };
   } else if (req.params.provider === 'supabase') {
     if (!config.supabaseUrl || !config.supabaseKey) { res.status(400).json({ error: 'Speichern Sie die URL und den Publishable / Anon Key.' }); return; }
     url = `${config.supabaseUrl.replace(/\/$/, '')}/auth/v1/settings`; headers = { apikey: config.supabaseKey };
@@ -66,8 +67,20 @@ router.post('/admin/integrations/test/:provider', async (req, res) => {
   } else { res.status(400).json({ error: 'Unbekannte Integration.' }); return; }
   try {
     const response = await fetch(url, { headers, signal: AbortSignal.timeout(10000), redirect: 'error' });
-    if (!response.ok) { res.status(400).json({ error: req.params.provider === 'resend' && response.status === 403 ? 'Der Schlüssel erlaubt keine Domainprüfung. Ein reiner Versandschlüssel wird beim Senden überprüft.' : 'Die Verbindung konnte nicht geprüft werden. Prüfen Sie die Zugangsdaten und Berechtigungen.' }); return; }
+    if (!response.ok) {
+      const body: unknown = await response.json().catch(() => null);
+      res.status(response.status === 429 ? 429 : response.status >= 500 ? 502 : 400).json({
+        error: integrationTestError(String(req.params.provider), response.status, body),
+        provider: req.params.provider, providerStatus: response.status,
+      });
+      return;
+    }
     res.json({ message: 'Die Verbindung wurde erfolgreich geprüft. Es wurde keine E-Mail oder SMS gesendet.' });
   } catch { res.status(502).json({ error: 'Der Dienst ist nicht erreichbar. Bitte versuchen Sie es erneut.' }); }
 });
+const handleStorageError: ErrorRequestHandler = (error, _req, res, next) => {
+  if (!(error instanceof IntegrationDecryptionError)) { next(error); return; }
+  res.status(503).json({ error: error.message, code: 'INTEGRATION_DECRYPTION_FAILED' });
+};
+router.use('/admin/integrations', handleStorageError);
 export default router;

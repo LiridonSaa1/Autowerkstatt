@@ -1,6 +1,15 @@
 import { z } from 'zod';
 import { readSettings } from './settings';
-import { seedDefaultServices } from './services';
+import { mapEmbedUrl } from '../lib/map-embed';
+import { readBookingSchedule } from './booking-schedule';
+import { scheduleSlots, scheduleClosureReason } from '../lib/booking-schedule';
+import { notifyBusiness } from '../lib/business-notifications';
+import { sendEmail } from '../lib/send-email';
+import { logger } from '../lib/logger';
+import {
+  renderCustomerAppointmentEmail,
+  renderCustomerContactAcknowledgmentEmail,
+} from '../lib/email-templates';
 import { and, asc, count, desc, eq, gte, lt, ne, sql } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import {
@@ -36,25 +45,9 @@ import {
 import { requireAdmin } from "../middlewares/requireAdmin";
 
 const router: IRouter = Router();
-const appointmentTimes = ["09:00", "10:00", "11:30", "14:00", "15:30"];
 
 function calendarDate(value: Date | string): string {
   return value instanceof Date ? value.toISOString().slice(0, 10) : value;
-}
-
-function tiranaToday(): string {
-  const parts = new Intl.DateTimeFormat("en", {
-    timeZone: "Europe/Tirane",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${value.year}-${value.month}-${value.day}`;
-}
-
-function isSunday(date: string): boolean {
-  return new Date(`${date}T12:00:00Z`).getUTCDay() === 0;
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -64,21 +57,15 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 router.get("/shop", async (_req, res): Promise<void> => {
-  res.json(await readSettings());
+  const [settings, schedule] = await Promise.all([readSettings(), readBookingSchedule()]);
+  res.json({ ...settings, weeklyHours: schedule.weekly, mapEmbedUrl: await mapEmbedUrl(settings.mapUrl) });
 });
 
 router.get("/services", async (_req, res): Promise<void> => {
-  let services = await db
+  const services = await db
     .select()
     .from(servicesTable)
     .orderBy(asc(servicesTable.name));
-  if (services.length === 0) {
-    await seedDefaultServices();
-    services = await db
-      .select()
-      .from(servicesTable)
-      .orderBy(asc(servicesTable.name));
-  }
   res.json(ListServicesResponse.parse(services));
 });
 
@@ -140,19 +127,20 @@ router.get("/availability", async (req, res): Promise<void> => {
       ),
   ]);
 
-  const today = tiranaToday();
+  const schedule = await readBookingSchedule();
   const days = Array.from({ length: dayCount }, (_, index) => {
     const date = `${parsed.data.month}-${String(index + 1).padStart(2, "0")}`;
+    const times = scheduleSlots(schedule, date);
     const unavailableDay =
-      date < today ||
-      isSunday(date) ||
+      times.length === 0 ||
       blocks.some((block) => block.date === date && block.time === null);
     return {
       date,
+      reason: scheduleClosureReason(schedule, date) || (blocks.some((block) => block.date === date && block.time === null) ? 'Geschlossen' : null) || (times.length > 0 && times.every((time) => appointments.some((appointment) => appointment.date === date && appointment.time === time) || blocks.some((block) => block.date === date && block.time === time)) ? 'Ausgebucht' : null),
       open: !unavailableDay,
       slots: unavailableDay
         ? []
-        : appointmentTimes.map((time) => ({
+        : times.map((time) => ({
             time,
             available:
               !appointments.some(
@@ -180,13 +168,14 @@ router.post("/appointments", async (req, res): Promise<void> => {
 
   const data = parsed.data;
   const date = calendarDate(data.appointmentDate);
-  if (!appointmentTimes.includes(data.appointmentTime)) {
+  const schedule = await readBookingSchedule();
+  if (!scheduleSlots(schedule, date).includes(data.appointmentTime)) {
     res.status(400).json({ error: "Die gewählte Uhrzeit ist nicht verfügbar." });
     return;
   }
 
   const [service] = await db
-    .select({ id: servicesTable.id })
+    .select({ id: servicesTable.id, name: servicesTable.name })
     .from(servicesTable)
     .where(eq(servicesTable.id, data.serviceId));
   if (!service && !data.customService?.trim()) {
@@ -216,7 +205,7 @@ router.post("/appointments", async (req, res): Promise<void> => {
     )
     .limit(1);
 
-  if (blocked || existing || isSunday(date) || date < tiranaToday()) {
+  if (blocked || existing || !scheduleSlots(await readBookingSchedule(), date).includes(data.appointmentTime)) {
     res.status(409).json({ error: "Dieser Termin ist nicht mehr verfügbar." });
     return;
   }
@@ -253,6 +242,50 @@ router.post("/appointments", async (req, res): Promise<void> => {
     throw error;
   }
 
+  const serviceName = data.customService || service?.name || 'Andere Leistung';
+  const vehicleText = `${data.vehicleMake} ${data.vehicleModel}, ${data.vehicleYear}`;
+
+  await notifyBusiness({
+    kind: 'appointment', customer: { name: data.customerName, email: data.email }, phone: data.phone,
+    referenceCode, date, time: data.appointmentTime, service: serviceName,
+    vehicle: vehicleText, licensePlate: data.licensePlate, vin: data.vin, notes: data.notes,
+  });
+
+  // Send branded confirmation email to customer (best-effort, non-blocking)
+  (async () => {
+    try {
+      const shop = await readSettings();
+      const customerHtml = renderCustomerAppointmentEmail({
+        customerName: data.customerName,
+        email: data.email,
+        phone: data.phone,
+        referenceCode,
+        date,
+        time: data.appointmentTime,
+        service: serviceName,
+        vehicle: vehicleText,
+        licensePlate: data.licensePlate,
+        vin: data.vin,
+        notes: data.notes,
+        business: shop,
+        isConfirmed: false,
+      });
+
+      await sendEmail({
+        name: data.customerName,
+        email: data.email,
+        subject: `Ihre Terminanfrage ${referenceCode} · ${shop.name}`,
+        message: `Hallo ${data.customerName},\n\nvielen Dank für Ihre Terminanfrage (${referenceCode}) am ${date} um ${data.appointmentTime} Uhr für ${serviceName}.\n\nFahrzeug: ${vehicleText}\n\nUnser Team prüft die Verfügbarkeit und meldet sich schnellstmöglich bei Ihnen.\n\n${shop.name}\n${shop.phone || ''}`,
+        html: customerHtml,
+        senderName: shop.name,
+        fallbackEmail: shop.email,
+        replyTo: shop.email ? { name: shop.name, email: shop.email } : undefined,
+      });
+    } catch (mailErr) {
+      logger.error({ err: mailErr, referenceCode }, 'Could not dispatch customer appointment confirmation email');
+    }
+  })();
+
   res.status(201).json(
     CreateAppointmentResponse.parse({
       referenceCode,
@@ -288,6 +321,34 @@ router.post("/contact", async (req, res): Promise<void> => {
   }
   const values = insertContactMessageSchema.parse(parsed.data);
   await db.insert(contactMessagesTable).values(values);
+  await notifyBusiness({ kind: 'contact', customer: { name: parsed.data.name, email: parsed.data.email }, subject: parsed.data.subject, message: parsed.data.message });
+
+  // Send branded acknowledgment email to customer (best-effort, non-blocking)
+  (async () => {
+    try {
+      const shop = await readSettings();
+      const customerHtml = renderCustomerContactAcknowledgmentEmail({
+        customerName: parsed.data.name,
+        subject: parsed.data.subject,
+        message: parsed.data.message,
+        business: shop,
+      });
+
+      await sendEmail({
+        name: parsed.data.name,
+        email: parsed.data.email,
+        subject: `Ihre Nachricht an ${shop.name} erhalten: ${parsed.data.subject}`,
+        message: `Hallo ${parsed.data.name},\n\nvielen Dank für Ihre Kontaktaufnahme. Wir haben Ihre Nachricht erhalten und kümmern uns schnellstmöglich um Ihr Anliegen.\n\n${shop.name}\n${shop.phone || ''}`,
+        html: customerHtml,
+        senderName: shop.name,
+        fallbackEmail: shop.email,
+        replyTo: shop.email ? { name: shop.name, email: shop.email } : undefined,
+      });
+    } catch (mailErr) {
+      logger.error({ err: mailErr }, 'Could not dispatch customer contact acknowledgment email');
+    }
+  })();
+
   res.status(201).json(
     CreateContactMessageResponse.parse({
       message: "Ihre Nachricht wurde empfangen. Vielen Dank für Ihre Kontaktaufnahme.",

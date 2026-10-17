@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { customFetch, useListServices, getListServicesQueryKey, type Service } from '@workspace/api-client-react';
-import { Clock3, LoaderCircle, Pencil, Plus, RotateCcw, Search, Sparkles, Trash2, Wrench } from 'lucide-react';
+import { Clock3, LoaderCircle, Pencil, Plus, Search, Sparkles, Trash2, Wrench } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import DeleteConfirmation from '@/components/delete-confirmation';
 import { ServiceIcon, AVAILABLE_SERVICE_ICONS, resolveServiceIconKey } from '@/components/service-icon';
@@ -114,15 +114,6 @@ export default function ServicesPanel() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => seedDefaults.mutate()}
-            disabled={seedDefaults.isPending}
-            className="flex items-center gap-2 rounded-xl border border-border bg-card hover:bg-muted/50 px-4 py-3 text-xs font-semibold shadow-sm transition-all disabled:opacity-50"
-          >
-            {seedDefaults.isPending ? <LoaderCircle size={15} className="animate-spin text-accent" /> : <RotateCcw size={15} className="text-accent" />}
-            <span>Standard-Leistungen laden</span>
-          </button>
           <button
             onClick={() => begin(null)}
             className="flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-xs font-bold text-primary-foreground shadow-sm transition-all hover:opacity-90"

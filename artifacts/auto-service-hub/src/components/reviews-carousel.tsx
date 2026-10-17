@@ -71,7 +71,7 @@ export default function ReviewsCarousel({ reviews }: { reviews: Review[] }) {
           return (
             <CarouselItem key={`${review.id}-${slideIndex}`} aria-hidden={slideIndex >= reviews.length ? true : undefined} className="flex pl-4 md:basis-1/2 lg:basis-1/3 lg:pl-5">
               <article
-                className={`group relative flex min-h-[235px] w-full flex-col justify-between overflow-hidden rounded-2xl border bg-white/85 p-5 shadow-[0_8px_30px_-18px_rgba(80,55,40,.2)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-accent/60 hover:shadow-[0_16px_36px_-12px_rgba(235,90,40,0.15)] sm:p-5 ${slideIndex === (selected + 1) % slides.length ? 'border-accent/70 lg:-translate-y-3 shadow-[0_12px_30px_-10px_rgba(255,94,30,.2)]' : 'border-border/60'}`}
+                className={`group relative flex min-h-[235px] w-full flex-col justify-between overflow-hidden rounded-none border bg-white/85 p-5 shadow-[0_8px_30px_-18px_rgba(80,55,40,.2)] backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-accent/60 hover:shadow-[0_16px_36px_-12px_rgba(235,90,40,0.15)] sm:p-5 ${slideIndex === (selected + 1) % slides.length ? 'border-accent/70 lg:-translate-y-3 shadow-[0_12px_30px_-10px_rgba(255,94,30,.2)]' : 'border-border/60'}`}
                 data-testid={`review-featured-${review.id}`}
               >
                 {/* Top orange accent indicator */}
@@ -122,9 +122,9 @@ export default function ReviewsCarousel({ reviews }: { reviews: Review[] }) {
                 </blockquote>
 
                 {/* Footer: Customer initials & Car info */}
-                <footer className="relative mt-auto flex min-h-20 items-center gap-2.5 border-t border-border/70 pr-28 pt-4">
+                <footer className="relative mt-auto flex min-h-20 items-center gap-2.5 border-t border-border/70 pr-36 sm:pr-40 pt-4">
                   <span
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-accent/15 bg-accent/10 text-xs font-bold text-accent shadow-2xs"
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-none border border-accent/15 bg-accent/10 text-xs font-bold text-accent shadow-2xs"
                     aria-hidden="true"
                   >
                     {initials}

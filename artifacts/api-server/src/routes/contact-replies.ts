@@ -1,4 +1,5 @@
 import { sendEmail } from '../lib/send-email';
+import { renderContactReplyEmail } from '../lib/email-templates';
 import { Router } from 'express';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod/v4';
@@ -42,8 +43,26 @@ router.post('/admin/contact-messages/:id/reply', requireAdmin, async (req, res) 
   const [contact] = await db.select().from(contactMessagesTable).where(eq(contactMessagesTable.id, id.data));
   if (!contact) { res.status(404).json({ error: 'Die Nachricht wurde nicht gefunden.' }); return; }
   const settings = await readSettings();
+  const html = renderContactReplyEmail({
+    customerName: contact.name,
+    subject: body.data.subject,
+    replyMessage: body.data.message,
+    originalMessage: contact.message,
+    originalSubject: contact.subject,
+    originalDate: contact.createdAt ? contact.createdAt.toISOString().slice(0, 10) : null,
+    business: settings,
+  });
   try {
-    await sendEmail({ name: contact.name, email: contact.email, subject: body.data.subject, message: body.data.message, senderName: settings.name, fallbackEmail: settings.email });
+    await sendEmail({
+      name: contact.name,
+      email: contact.email,
+      subject: body.data.subject,
+      message: body.data.message,
+      html,
+      senderName: settings.name,
+      fallbackEmail: settings.email,
+      replyTo: settings.email ? { name: settings.name, email: settings.email } : undefined,
+    });
   } catch { res.status(502).json({ error: 'Der Versand wurde nicht bestätigt. Prüfen Sie die Integration und den E-Mail-Verlauf, bevor Sie erneut senden.' }); return; }
   // Sending has succeeded; a database failure must not invite a duplicate email.
   try {

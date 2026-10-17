@@ -60,6 +60,10 @@ const services = [
 ];
 
 async function main() {
+  await pool.query(
+    "DELETE FROM services WHERE id NOT IN ('tech-repairs', 'engine-diag', 'system-service', 'oil-filters', 'tires-wheels', 'electrical-system')"
+  );
+
   for (const s of services) {
     await pool.query(
       `INSERT INTO services (id, name, category, description, price_label, duration_minutes, icon)
@@ -75,7 +79,7 @@ async function main() {
     );
   }
 
-  const res = await pool.query('SELECT id, name, category, price_label, icon FROM services');
+  const res = await pool.query('SELECT id, name, category, price_label, icon FROM services ORDER BY name ASC');
   console.log('Seeded services in database:', res.rows);
   await pool.end();
 }

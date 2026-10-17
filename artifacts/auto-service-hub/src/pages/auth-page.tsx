@@ -24,7 +24,15 @@ export default function AuthPage() {
   }
   return <main className="surface-grid flex min-h-[100dvh] items-center justify-center px-4 py-16">
     <div className="w-full max-w-md rounded-xl border border-border bg-card p-8 shadow-xl">
-      <Link href="/" className="font-display text-xl font-bold uppercase text-accent">Auto Service Hub</Link>
+      <Link href="/" className="inline-block transition-opacity hover:opacity-90" aria-label="Zur Startseite">
+        <img
+          src={`${import.meta.env.BASE_URL}service-car-logo.png`}
+          alt="Service Car"
+          width={817}
+          height={273}
+          className="h-11 w-auto object-contain"
+        />
+      </Link>
       <h1 className="my-6 font-display text-3xl font-bold">Administrator-Anmeldung</h1>
       <form onSubmit={submit} className="grid gap-5">
         <label className="grid gap-2 text-sm">E-Mail<input name="email" type="email" defaultValue="liridon.salihi123@gmail.com" autoComplete="email" required className="rounded border border-border bg-background p-3" /></label>

@@ -8,6 +8,7 @@
 import type { AvailabilitySlot } from './availabilitySlot';
 
 export interface DayAvailability {
+  reason?: string | null;
   date: Date;
   open: boolean;
   slots: AvailabilitySlot[];

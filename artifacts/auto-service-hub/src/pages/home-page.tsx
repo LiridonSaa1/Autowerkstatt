@@ -1,6 +1,9 @@
+import { SiFacebook, SiInstagram, SiTiktok } from 'react-icons/si';
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import ReviewsCarousel from '@/components/reviews-carousel';
-import { QuoteRequestForm } from '@/components/quotes';
+import HeroTitle from '@/components/hero-title';
+import BookingWizard from '@/components/booking-wizard';
+import BrandsSlider from '@/components/brands-slider';
 import ServicesSection from '@/components/services-section';
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -8,39 +11,35 @@ import {
   ArrowDown,
   ArrowRight,
   ArrowUpRight,
-  CalendarDays,
-  Check,
-  ChevronLeft,
-  ChevronRight,
+  Award,
   Clock3,
+  Cpu,
   Gauge,
+  Mail,
+  LogIn,
   MapPin,
   Menu,
   MessageCircle,
   Phone,
+  PhoneCall,
   ShieldCheck,
   Sparkles,
   Star,
   X,
 } from 'lucide-react';
-import { calendarDateKey, formatCalendarDate } from '@/lib/date-format';
+import { formatCalendarDate } from '@/lib/date-format';
 import {
-  getGetAvailabilityQueryKey,
   getGetShopInfoQueryKey,
   getListApprovedReviewsQueryKey,
   getListServicesQueryKey,
-  useCreateAppointment,
   useCreateContactMessage,
   useCreateReview,
-  useGetAvailability,
   useGetShopInfo,
   useListApprovedReviews,
   useListPortfolio,
   useListServices,
 } from '@workspace/api-client-react';
 
-const monthInput = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-const monthsDe = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 const portfolioCategories = ['Alle', 'Motor', 'Bremsen & Teile', 'Pflege & Aufbereitung'];
 function SectionEyebrow({ children, inverse = false }: { children: string; inverse?: boolean }) {
   return (
@@ -55,7 +54,7 @@ function LoadingCards({ count = 3 }: { count?: number }) {
   return (
     <div className="grid gap-4 md:grid-cols-3">
       {Array.from({ length: count }).map((_, index) => (
-        <div key={index} className="h-56 animate-pulse rounded-xl border border-border bg-card/70" />
+        <div key={index} className="h-56 animate-pulse rounded-none border border-border bg-card/70" />
       ))}
     </div>
   );
@@ -70,35 +69,25 @@ export default function HomePage() {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
-
   const [hoverRating, setHoverRating] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [month, setMonth] = useState(() => new Date());
-  const [selectedDay, setSelectedDay] = useState('');
-  const [selectedTime, setSelectedTime] = useState('');
-  const [selectedServiceId, setSelectedServiceId] = useState('');
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [portfolioCategory, setPortfolioCategory] = useState(portfolioCategories[0]);
   const [selectedWorkId, setSelectedWorkId] = useState<number | null>(null);
-  const availabilityParams = useMemo(() => ({ month: monthInput(month) }), [month]);
-  const availabilityQuery = useGetAvailability(availabilityParams, {
-    query: { queryKey: getGetAvailabilityQueryKey(availabilityParams), refetchInterval: 15000 },
-  });
-  const createBooking = useCreateAppointment();
   const createMessage = useCreateContactMessage();
   const createReview = useCreateReview();
-  const [bookingSuccess, setBookingSuccess] = useState('');
   const [reviewSuccess, setReviewSuccess] = useState('');
   const [messageSuccess, setMessageSuccess] = useState('');
-  const [bookingError, setBookingError] = useState('');
   const [reviewError, setReviewError] = useState('');
   const [messageError, setMessageError] = useState('');
-  const shop = shopQuery.data as (NonNullable<typeof shopQuery.data> & { email?: string }) | undefined;
+  const shop = shopQuery.data as (NonNullable<typeof shopQuery.data> & { email?: string; facebookUrl?: string; instagramUrl?: string; tiktokUrl?: string; weeklyHours?: { enabled: boolean; start: string; end: string; breakStart: string; breakEnd: string }[] }) | undefined;
   const businessName = shop?.name || 'KFZ-Service';
   const businessTagline = shop?.tagline || '';
   const { refetch: refetchShop } = shopQuery;
   useEffect(() => {
     const update = (event: StorageEvent) => {
       if (event.key === 'shop-settings-updated') void refetchShop();
+      if (event.key === 'booking-schedule-updated') void refetchShop();
       if (event.key === 'shop-services-updated') void queryClient.invalidateQueries({ queryKey: getListServicesQueryKey() });
     };
     window.addEventListener('storage', update);
@@ -117,49 +106,10 @@ export default function HomePage() {
   const portfolio = portfolioQuery.data ?? [];
   const reviews = reviewQuery.data ?? [];
   const averageReviewRating = reviews.length ? (reviews.reduce((total, review) => total + review.rating, 0) / reviews.length).toFixed(1) : '—';
-  const availableDays = availabilityQuery.data ?? [];
-  const selectedAvailability = availableDays.find((day) => calendarDateKey(day.date) === selectedDay);
   const filteredPortfolio = portfolioCategory === portfolioCategories[0]
     ? portfolio
     : portfolio.filter((item) => item.category.toLocaleLowerCase('de-DE') === portfolioCategory.toLocaleLowerCase('de-DE'));
   const selectedWork = portfolio.find((item) => item.id === selectedWorkId);
-  const changeMonth = (amount: number) => {
-    setMonth((current) => new Date(current.getFullYear(), current.getMonth() + amount, 1));
-    setSelectedDay('');
-    setSelectedTime('');
-  };
-
-  const submitBooking = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    setBookingError('');
-    setBookingSuccess('');
-    createBooking.mutate({
-      data: {
-        serviceId: selectedServiceId,
-        customService: selectedServiceId === 'custom' ? String(form.get('customService') ?? '') : null,
-        vehicleMake: String(form.get('vehicleMake') ?? ''),
-        vehicleModel: String(form.get('vehicleModel') ?? ''),
-        vehicleYear: Number(form.get('vehicleYear')),
-        licensePlate: String(form.get('licensePlate') ?? '') || null,
-        appointmentDate: new Date(`${selectedDay}T00:00:00Z`).toISOString(),
-        appointmentTime: selectedTime,
-        customerName: String(form.get('customerName') ?? ''),
-        phone: String(form.get('phone') ?? ''),
-        email: String(form.get('email') ?? ''),
-        notes: String(form.get('notes') ?? '') || null,
-      },
-    }, {
-      onSuccess: (receipt) => {
-        setBookingSuccess(`Ihre Anfrage wurde gesendet. Ihr Referenzcode lautet ${receipt.referenceCode}.`);
-        setSelectedDay('');
-        setSelectedTime('');
-        void queryClient.invalidateQueries({ queryKey: getGetAvailabilityQueryKey(availabilityParams) });
-      },
-      onError: () => setBookingError('Ihre Anfrage konnte nicht gesendet werden. Bitte prüfen Sie die Angaben und versuchen Sie es erneut.'),
-    });
-  };
-
   const submitReview = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formElement = event.currentTarget;
@@ -168,7 +118,7 @@ export default function HomePage() {
     createReview.mutate({
       data: {
         customerName: String(form.get('reviewName') ?? ''),
-        carModel: String(form.get('carModel') ?? ''),
+        carModel: `${String(form.get('reviewVehicleBrand') ?? '').trim()} ${String(form.get('reviewVehicleModel') ?? '').trim()}`,
         rating: Number(form.get('rating')),
         comment: String(form.get('comment') ?? ''),
       },
@@ -212,49 +162,51 @@ export default function HomePage() {
       <header className="absolute inset-x-0 top-0 z-40 border-b border-white/15 text-white">
         <div className="mx-auto flex h-[76px] max-w-[1340px] items-center justify-between px-5 lg:px-10">
           <a href="#fillimi" className="flex shrink-0 items-center gap-3" aria-label={`${businessName} — Startseite`} data-testid="link-home">
-            <img src={`${import.meta.env.BASE_URL}kfz-service-logo-transparent.png`} alt={businessName} width={1536} height={1024} className="h-14 w-auto object-contain sm:h-16" />
-            <span className="hidden max-w-32 font-display text-sm font-bold uppercase leading-tight xl:block" data-testid="header-business-name">{businessName}</span>
+            <img src={`${import.meta.env.BASE_URL}service-car-logo-light.png`} alt={businessName} width={817} height={273} className="h-11 w-auto object-contain sm:h-14" />
           </a>
-          <nav className="hidden items-center gap-6 text-[12px] font-semibold text-white/75 lg:flex">
+          <nav className="hidden items-center gap-6 text-[15px] font-semibold text-white/75 lg:flex">
             <a href="#rreth-nesh" className="transition-colors hover:text-orange-300">Über uns</a>
-            <a href="#punet" className="transition-colors hover:text-orange-300">Unsere Arbeiten</a>
             <a href="#sherbimet" className="transition-colors hover:text-orange-300">Leistungen</a>
-            <a href="#angebote" className="hover:text-orange-300">Angebot</a>
             <a href="#vleresime" className="transition-colors hover:text-orange-300">Bewertungen</a>
             <a href="#kontakt" className="transition-colors hover:text-orange-300">Kontakt</a>
-            <a href="/sign-in" className="transition-colors hover:text-orange-300">Admin</a>
           </nav>
+          <div className="flex items-center gap-3">
           <a href="#rezervo" className="hidden items-center gap-2 bg-accent px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-white transition-transform hover:-translate-y-0.5 sm:flex">
             Termin vereinbaren
             <ArrowUpRight size={15} />
           </a>
+          <a href="/sign-in" aria-label="Anmelden" title="Anmelden" className="grid h-10 w-10 shrink-0 place-items-center border border-white/25 text-white transition-colors hover:border-accent hover:bg-accent" data-testid="link-login">
+            <LogIn size={20} aria-hidden="true" />
+          </a>
           <button type="button" onClick={() => setMenuOpen((value) => !value)} className="grid h-10 w-10 place-items-center border border-white/25 lg:hidden" aria-label={menuOpen ? 'Menü schließen' : 'Menü öffnen'} data-testid="button-menu">
             {menuOpen ? <X size={19} /> : <Menu size={19} />}
           </button>
+          </div>
         </div>
         {menuOpen && (
-          <nav className="grid gap-4 border-t border-white/15 bg-primary px-6 py-6 text-sm text-white lg:hidden">
+          <nav className="grid gap-4 border-t border-white/15 bg-primary px-6 py-6 text-base text-white lg:hidden">
             <a href="#rreth-nesh" onClick={() => setMenuOpen(false)}>Über uns</a>
-            <a href="#punet" onClick={() => setMenuOpen(false)}>Unsere Arbeiten</a>
             <a href="#sherbimet" onClick={() => setMenuOpen(false)}>Leistungen</a>
-            <a href="#angebote" className="hover:text-orange-300">Angebot</a>
             <a href="#vleresime" onClick={() => setMenuOpen(false)}>Bewertungen</a>
             <a href="#kontakt" onClick={() => setMenuOpen(false)}>Kontakt</a>
-            <a href="/sign-in" onClick={() => setMenuOpen(false)}>Administrator-Anmeldung</a>
             <a href="#rezervo" onClick={() => setMenuOpen(false)} className="font-bold text-orange-300">Termin vereinbaren</a>
           </nav>
         )}
       </header>
 
       <section id="fillimi" className="relative flex min-h-[730px] items-end bg-primary text-white md:min-h-[800px]">
-        <div className="absolute inset-y-0 right-0 w-full overflow-hidden md:w-[76%]">
-          <img src={`${import.meta.env.BASE_URL}workshop-hero.jpg`} alt="" className="h-full w-full object-cover object-center opacity-55 mix-blend-luminosity md:opacity-65 md:mix-blend-normal" />
-          <div className="absolute inset-0 bg-gradient-to-r from-primary via-primary/75 to-primary/25 md:via-primary/55" />
-          <div className="absolute inset-0 bg-gradient-to-t from-primary via-transparent to-primary/45" />
+        <div className="absolute inset-0 w-full overflow-hidden">
+          <img
+            src={`${import.meta.env.BASE_URL}workshop-hero.jpg`}
+            alt="Service Car Werkstatt"
+            className="h-full w-full object-cover object-[78%_center] md:object-[80%_center] opacity-90 md:opacity-95"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-primary via-primary/85 to-primary/20 sm:via-primary/75 md:via-primary/55 md:to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-transparent to-primary/50" />
         </div>
-        <div className="hero-lines absolute inset-0 opacity-70" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_72%_42%,rgba(233,99,52,.18),transparent_40%)]" />
-        <div className="absolute right-[-8%] top-[20%] hidden h-[500px] w-[62%] border border-white/10 md:block">
+        <div className="hero-lines absolute inset-0 opacity-40 pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_78%_45%,rgba(233,99,52,.12),transparent_48%)] pointer-events-none" />
+        <div className="absolute right-[-8%] top-[20%] hidden h-[500px] w-[62%] border border-white/10 md:block pointer-events-none">
           <div className="absolute inset-5 border border-white/10" />
           <div className="absolute right-[16%] top-[10%] h-[80%] w-[1px] bg-white/10" />
           <div className="absolute bottom-[19%] left-[9%] right-[9%] h-[1px] bg-white/10" />
@@ -267,13 +219,7 @@ export default function HomePage() {
               <span className="h-px w-9 bg-current" />
               {businessTagline}
             </div>
-            <h1 className="reveal reveal-delay-1 font-display text-[clamp(4.4rem,10.7vw,9.8rem)] font-bold uppercase leading-[.78] tracking-[-.035em]">
-              Ihr Auto.
-              <br />
-              <span className="text-orange-300">In guten</span>
-              <br />
-              Händen.
-            </h1>
+            <HeroTitle />
             <p className="reveal reveal-delay-2 mt-8 max-w-[520px] text-sm leading-7 text-white/65 md:text-base">
               Faire Reparaturen, sorgfältige Fahrzeugpflege und klare Informationen vor Ihrer Entscheidung. Entdecken Sie unsere Leistungen und buchen Sie online.
             </p>
@@ -308,7 +254,7 @@ export default function HomePage() {
           { image: 'online-booking.jpg', title: 'Einfach Termine anfragen', text: 'Wählen Sie Tag und Uhrzeit online.' },
         ].map(({ image, title, text }) => (
           <div key={title} className="flex min-h-[126px] flex-col items-start gap-3 border-b border-r border-border px-4 py-5 last:border-r-0 sm:flex-row sm:items-center md:border-b-0 md:px-5">
-            <img src={`${import.meta.env.BASE_URL}benefits/${image}`} alt="" width={1024} height={1024} loading="lazy" className="h-16 w-16 shrink-0 rounded-xl object-contain mix-blend-multiply lg:h-20 lg:w-20" />
+            <img src={`${import.meta.env.BASE_URL}benefits/${image}`} alt="" width={1024} height={1024} loading="lazy" className="h-16 w-16 shrink-0 rounded-none object-contain mix-blend-multiply lg:h-20 lg:w-20" />
             <div className="min-w-0">
               <h2 className="text-xs font-bold uppercase tracking-wide">{title}</h2>
               <p className="mt-1.5 text-[11px] leading-5 text-muted-foreground">{text}</p>
@@ -327,130 +273,131 @@ export default function HomePage() {
             <h2 className="mt-5 max-w-2xl font-display text-6xl font-bold uppercase leading-[.88] md:text-8xl">Mehr als<br />eine Werkstatt.</h2>
             <p className="mt-7 max-w-[600px] text-sm leading-7 text-muted-foreground">Ihr Auto ist mehr als ein Fahrzeug. Es begleitet Ihren Alltag, Ihre Pläne und die Menschen, die Ihnen wichtig sind. Deshalb erklären wir Ihnen, was wir feststellen, was warten kann und was jetzt Aufmerksamkeit braucht.</p>
             <p className="mt-4 max-w-[600px] text-sm leading-7 text-muted-foreground">Von der ersten Prüfung bis zum letzten Pflegeschritt verfolgen wir ein Ziel: Sie sollen mit einem guten Gefühl wieder losfahren.</p>
-            <div className="mt-10 grid max-w-3xl grid-cols-1 border-y border-border py-6 sm:grid-cols-3">
-              <div className="pr-5">
-                <span className="font-display text-2xl font-bold uppercase">Zertifizierte Mechaniker</span>
-                <p className="mt-1 text-xs text-muted-foreground">Erfahrung und Sorgfalt für jedes Fahrzeug.</p>
+            <div className="mt-10 grid max-w-3xl grid-cols-1 gap-3.5 sm:grid-cols-3 sm:gap-0 sm:border-y sm:border-border sm:py-6">
+              <div className="flex items-start gap-4 rounded-none border border-border/80 bg-white/80 p-4 shadow-xs backdrop-blur-sm sm:flex-col sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:pr-5 sm:shadow-none">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-none border border-accent/20 bg-accent/10 text-accent sm:hidden">
+                  <ShieldCheck size={20} strokeWidth={1.8} />
+                </span>
+                <div className="min-w-0">
+                  <span className="font-display text-xl font-bold uppercase tracking-tight text-foreground sm:text-2xl">
+                    Zertifizierte Mechaniker
+                  </span>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    Erfahrung und Sorgfalt für jedes Fahrzeug.
+                  </p>
+                </div>
               </div>
-              <div className="border-l border-border pl-6">
-                <span className="font-display text-2xl font-bold uppercase">Moderne Ausstattung</span>
-                <p className="mt-1 text-xs text-muted-foreground">Präzise Diagnose und gründliche Prüfung.</p>
+
+              <div className="flex items-start gap-4 rounded-none border border-border/80 bg-white/80 p-4 shadow-xs backdrop-blur-sm sm:flex-col sm:rounded-none sm:border-0 sm:border-l sm:border-border sm:bg-transparent sm:p-0 sm:pl-6 sm:shadow-none">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-none border border-accent/20 bg-accent/10 text-accent sm:hidden">
+                  <Cpu size={20} strokeWidth={1.8} />
+                </span>
+                <div className="min-w-0">
+                  <span className="font-display text-xl font-bold uppercase tracking-tight text-foreground sm:text-2xl">
+                    Moderne Ausstattung
+                  </span>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    Präzise Diagnose und gründliche Prüfung.
+                  </p>
+                </div>
               </div>
-              <div className="border-l border-border pl-6">
-                <span className="font-display text-2xl font-bold uppercase">Garantie auf unsere Arbeit</span>
-                <p className="mt-1 text-xs text-muted-foreground">Service, bei dem Sie im Mittelpunkt stehen.</p>
+
+              <div className="flex items-start gap-4 rounded-none border border-border/80 bg-white/80 p-4 shadow-xs backdrop-blur-sm sm:flex-col sm:rounded-none sm:border-0 sm:border-l sm:border-border sm:bg-transparent sm:p-0 sm:pl-6 sm:shadow-none">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-none border border-accent/20 bg-accent/10 text-accent sm:hidden">
+                  <Award size={20} strokeWidth={1.8} />
+                </span>
+                <div className="min-w-0">
+                  <span className="font-display text-xl font-bold uppercase tracking-tight text-foreground sm:text-2xl">
+                    Garantie auf unsere Arbeit
+                  </span>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    Service, bei dem Sie im Mittelpunkt stehen.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="punet" className="scroll-mt-16 bg-primary px-5 py-24 text-white md:px-10 md:py-32">
-        <div className="mx-auto max-w-[1340px]">
-          <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
-            <div>
-              <SectionEyebrow inverse>Unsere Arbeiten</SectionEyebrow>
-              <h2 className="mt-5 font-display text-6xl font-bold uppercase leading-[.87] tracking-tight md:text-8xl">Zurück auf die Straße,<br />frisch aufbereitet.</h2>
-            </div>
-            <p className="max-w-[340px] text-sm leading-7 text-white/55">Aktuelle Ergebnisse aus unserer Werkstatt. Jede Arbeit beginnt mit einer klaren Einschätzung und endet mit einer Abschlusskontrolle.</p>
-          </div>
-          {portfolioQuery.isLoading && <LoadingCards count={3} />}
-          {portfolioQuery.isError && (
-            <div className="border border-white/15 p-6 text-sm text-white/70" role="alert">
-              Die Arbeiten konnten nicht geladen werden.
-              <button type="button" onClick={() => void portfolioQuery.refetch()} className="ml-3 text-orange-300 underline">Erneut versuchen</button>
-            </div>
-          )}
-          {!portfolioQuery.isLoading && !portfolioQuery.isError && portfolio.length === 0 && (
-            <div className="border border-dashed border-white/25 px-8 py-14 text-center">
-              <Sparkles className="mx-auto text-orange-300" />
-              <p className="mt-4 text-sm text-white/65">Unsere Galerie mit abgeschlossenen Arbeiten wird in Kürze aktualisiert.</p>
-            </div>
-          )}
-          {portfolio.length > 0 && (
-            <>
-              <div className="mb-7 flex flex-wrap gap-2" role="group" aria-label="Galerie filtern">
-                {portfolioCategories.map((category) => (
-                  <button key={category} type="button" onClick={() => setPortfolioCategory(category)} aria-pressed={portfolioCategory === category} className={`border px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider transition-colors ${portfolioCategory === category ? 'border-accent bg-accent text-foreground' : 'border-white/20 text-white/65 hover:border-white/50 hover:text-white'}`} data-testid={`filter-portfolio-${category.toLocaleLowerCase('de-DE').replaceAll(' ', '-')}`}>{category}</button>
-                ))}
-              </div>
-              {filteredPortfolio.length === 0 ? (
-                <div className="border border-dashed border-white/25 px-8 py-14 text-center text-sm text-white/60">In dieser Kategorie sind noch keine Arbeiten vorhanden.</div>
-              ) : (
-            <div className="grid gap-4 md:grid-cols-12">
-              {filteredPortfolio.slice(0, 5).map((item, index) => (
-                <article key={item.id} className={`group relative min-h-[300px] overflow-hidden border border-white/10 bg-[#263a42] ${index === 0 ? 'md:col-span-7 md:row-span-2 md:min-h-[620px]' : 'md:col-span-5'}`} data-testid={`card-work-${item.id}`}>
-                  {item.imageUrl ? <img src={item.imageUrl} alt={`${item.title} — ${item.vehicleLabel}`} className="absolute inset-0 h-full w-full object-cover opacity-75 transition-transform duration-700 group-hover:scale-[1.035]" /> : <div className="absolute inset-0 hero-lines opacity-30" />}
-                  <div className="absolute inset-0 bg-gradient-to-t from-primary via-primary/10 to-transparent" />
-                  <div className="absolute inset-x-0 bottom-0 p-6 md:p-8">
-                    <span className="eyebrow text-orange-300">{item.category}</span>
-                    <h3 className="mt-2 font-display text-3xl font-bold uppercase">{item.title}</h3>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-4 text-xs text-white/65">
-                      <span>{item.vehicleLabel}</span>
-                      {item.completedAt && <span>{formatCalendarDate(item.completedAt)}</span>}
-                    </div>
-                    <p className="mt-3 max-w-lg text-xs leading-5 text-white/70">{item.description}</p>
-                    <button type="button" onClick={() => setSelectedWorkId(item.id)} className="mt-4 inline-flex items-center gap-2 border-b border-orange-300 pb-1 text-[10px] font-bold uppercase tracking-wider text-orange-300" data-testid={`button-preview-work-${item.id}`}>Foto ansehen <ArrowUpRight size={13} /></button>
-                  </div>
-                </article>
-              ))}
-            </div>
-              )}
-            </>
-          )}
-        </div>
-      </section>
+      <ServicesSection
+        services={services}
+        loading={serviceQuery.isLoading}
+        error={serviceQuery.isError}
+        onRetry={() => void serviceQuery.refetch()}
+        onSelect={(id) => setSelectedServiceIds((prev) => (prev.includes(id) ? prev : [...prev, id]))}
+      />
 
-      <ServicesSection services={services} loading={serviceQuery.isLoading} error={serviceQuery.isError} onRetry={() => void serviceQuery.refetch()} onSelect={setSelectedServiceId} />
-
-      <section className="bg-white px-5 py-20 md:px-10 md:py-24">
-        <div className="mx-auto grid max-w-[1340px] gap-12 lg:grid-cols-[.7fr_1.3fr]">
-          <div>
-            <SectionEyebrow>So arbeiten wir</SectionEyebrow>
-            <h2 className="mt-5 max-w-lg font-display text-5xl font-bold uppercase leading-[.9] md:text-7xl">Transparent,<br />von Anfang an.</h2>
-          </div>
-          <div className="grid gap-0 sm:grid-cols-3">
-            {[
-              ['01', 'Bedarf schildern', 'Wählen Sie eine Leistung und nennen Sie uns die Fahrzeugdaten.'],
-              ['02', 'Termin auswählen', 'Sehen Sie freie Termine und senden Sie Ihre Anfrage.'],
-              ['03', 'Wir melden uns', 'Wir bestätigen Ihren Termin und besprechen die nächsten Schritte.'],
-            ].map(([number, title, detail]) => (
-              <div key={number} className="border-t border-primary/20 py-6 sm:ml-6 sm:first:ml-0 sm:border-l sm:border-t-0 sm:pl-6">
-                <span className="font-display text-5xl font-bold text-accent">{number}</span>
-                <h3 className="mt-4 font-display text-2xl font-bold uppercase">{title}</h3>
-                <p className="mt-2 max-w-[220px] text-xs leading-6 text-muted-foreground">{detail}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <BookingWizard
+        services={services}
+        loading={serviceQuery.isLoading}
+        error={serviceQuery.isError}
+        onRetry={() => void serviceQuery.refetch()}
+        selectedServiceIds={selectedServiceIds}
+        onToggleService={(id) =>
+          setSelectedServiceIds((prev) =>
+            prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+          )
+        }
+        onClearServices={() => setSelectedServiceIds([])}
+      />
 
       <section id="vleresime" className="relative w-full scroll-mt-16 overflow-hidden bg-[#faf8f5] px-5 py-20 md:px-10 md:py-24">
         <div className="relative mx-auto w-full max-w-[1340px] bg-[radial-gradient(ellipse_at_70%_0%,rgba(255,176,107,.14),transparent_50%)]">
           <div className="relative mb-2 flex min-h-[220px] flex-col justify-between gap-5 pb-4 lg:flex-row lg:items-end">
             <div className="relative z-10 lg:max-w-[67%]">
               <SectionEyebrow>Kundenstimmen</SectionEyebrow>
-              <div className="mt-5 flex flex-wrap items-center gap-5 lg:gap-6">
-                <h2 className="font-display text-5xl font-bold uppercase leading-[.9] md:text-7xl">Vertrauen<br /><span className="text-accent">verbindet.</span></h2>
-                <div className="border-l border-border pl-6"><p className="text-3xl font-bold tracking-tight">{averageReviewRating}<span className="ml-1 text-base text-muted-foreground/60"> / 5</span></p><div className="mt-3 flex gap-1 text-accent" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <Star key={index} size={16} className={index < Math.round(Number(averageReviewRating)) ? 'fill-current' : 'opacity-25'} />)}</div><p className="mt-3 text-xs text-muted-foreground">{reviews.length} veröffentlichte Bewertungen</p></div>
+              <div className="mt-5 flex flex-nowrap items-center gap-4 sm:gap-6">
+                <h2 className="shrink-0 font-display text-3xl font-bold uppercase leading-[.9] min-[400px]:text-4xl sm:text-5xl md:text-6xl lg:text-7xl">
+                  Vertrauen<br /><span className="text-accent">verbindet.</span>
+                </h2>
+                <div className="shrink-0 border-l border-border/80 pl-4 sm:pl-6">
+                  <p className="text-2xl font-bold tracking-tight text-primary sm:text-3xl">
+                    {averageReviewRating}
+                    <span className="ml-1 text-sm font-normal text-muted-foreground/60 sm:text-base"> / 5</span>
+                  </p>
+                  <div className="mt-1.5 flex gap-1 text-accent sm:mt-2.5" aria-hidden="true">
+                    {Array.from({ length: 5 }, (_, index) => (
+                      <Star
+                        key={index}
+                        size={14}
+                        className={`sm:h-4 sm:w-4 ${index < Math.round(Number(averageReviewRating)) ? 'fill-current' : 'opacity-25'}`}
+                      />
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-muted-foreground sm:mt-2.5 sm:text-xs">
+                    {reviews.length} veröffentlichte Bewertungen
+                  </p>
+                </div>
               </div>
               <p className="mt-4 max-w-md text-xs leading-6 text-muted-foreground">Lesen Sie die Erfahrungen unserer Kunden. Neue Bewertungen werden nach Prüfung freigegeben.</p>
             </div>
-            <div className="relative h-44 overflow-hidden rounded-2xl lg:absolute lg:-right-[7%] lg:-top-6 lg:h-[260px] lg:w-[47%] lg:rounded-none lg:rounded-bl-[240px]" aria-hidden="true"><img src={`${import.meta.env.BASE_URL}customer-experience.png`} alt="" className="h-full w-full object-cover object-[70%_45%]" /><div className="absolute inset-0 bg-gradient-to-r from-[#faf8f5]/80 via-transparent to-transparent" /><div className="pointer-events-none absolute -left-12 top-0 hidden h-[115%] w-32 -rotate-[37deg] border-r border-white/70 bg-gradient-to-r from-orange-200/30 to-orange-500/65 lg:block" /></div>
+            <div className="relative h-44 overflow-hidden rounded-none lg:absolute lg:-right-[7%] lg:-top-6 lg:h-[260px] lg:w-[47%] lg:rounded-none lg:rounded-bl-[240px]" aria-hidden="true"><img src={`${import.meta.env.BASE_URL}customer-experience.png`} alt="" className="h-full w-full object-cover object-[70%_45%]" /><div className="absolute inset-0 bg-gradient-to-r from-[#faf8f5]/80 via-transparent to-transparent" /><div className="pointer-events-none absolute -left-12 top-0 hidden h-[115%] w-32 -rotate-[37deg] border-r border-white/70 bg-gradient-to-r from-orange-200/30 to-orange-500/65 lg:block" /></div>
             <Dialog open={reviewOpen} onOpenChange={(open) => { if (!createReview.isPending) { setReviewOpen(open); if (open) { setReviewError(''); setReviewSuccess(''); } } }}>
-              <DialogTrigger asChild><button className="relative z-10 inline-flex shrink-0 items-center justify-center gap-3 self-start rounded-xl bg-accent px-5 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-[0_8px_24px_-8px_rgba(255,94,30,.55)] transition-all hover:-translate-y-0.5 hover:bg-accent/90 lg:mb-4 lg:self-end" data-testid="button-open-review"><MessageCircle size={18} />Bewertung abgeben<ArrowRight size={16} /></button></DialogTrigger>
+              <DialogTrigger asChild><button className="relative z-10 inline-flex shrink-0 items-center justify-center gap-3 self-start rounded-none bg-accent px-5 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-[0_8px_24px_-8px_rgba(255,94,30,.55)] transition-all hover:-translate-y-0.5 hover:bg-accent/90 lg:mb-4 lg:self-end" data-testid="button-open-review"><MessageCircle size={18} />Bewertung abgeben<ArrowRight size={16} /></button></DialogTrigger>
               <DialogContent className="max-w-2xl border-white/15 bg-primary p-6 text-white md:p-9">
                 <div><span className="eyebrow text-orange-300">Erfahrung teilen</span><DialogTitle className="mt-3 font-display text-3xl font-bold uppercase">Wie war Ihr Besuch?</DialogTitle><DialogDescription className="mt-3 text-sm text-white/70">Ihre Bewertung wird geprüft und nach Freigabe veröffentlicht.</DialogDescription></div>
                             <form className="mt-7 grid gap-4 sm:grid-cols-2" onSubmit={submitReview}>
-              <label className="grid gap-2 text-xs text-white/70">Ihr Name<input required minLength={2} maxLength={120} name="reviewName" className="h-11 border border-white/20 bg-white/5 px-3 text-sm text-white outline-none focus:border-orange-300" placeholder="Vor- und Nachname" data-testid="input-review-name" /></label>
-              <label className="grid gap-2 text-xs text-white/70">Fahrzeug<input required minLength={2} maxLength={120} name="carModel" className="h-11 border border-white/20 bg-white/5 px-3 text-sm text-white outline-none focus:border-orange-300" placeholder="z. B. Marke und Modell" data-testid="input-review-car" /></label>
+              <label className="grid gap-2 text-xs text-white/70 sm:col-span-2">
+                Ihr Name
+                <input required minLength={2} maxLength={120} name="reviewName" className="h-11 border border-white/20 bg-white/5 px-3 text-sm text-white outline-none focus:border-orange-300" placeholder="Vor- und Nachname" data-testid="input-review-name" />
+              </label>
+
+              <label className="grid min-w-0 gap-2 text-xs text-white/70">
+                Fahrzeugmarke
+                <input required maxLength={50} name="reviewVehicleBrand" disabled={createReview.isPending} className="h-11 border border-white/20 bg-white/5 px-3 text-sm text-white outline-none focus:border-orange-300" placeholder="z. B. Audi" data-testid="input-review-brand" />
+              </label>
+              <label className="grid min-w-0 gap-2 text-xs text-white/70">
+                Modell
+                <input required maxLength={69} name="reviewVehicleModel" disabled={createReview.isPending} className="h-11 border border-white/20 bg-white/5 px-3 text-sm text-white outline-none focus:border-orange-300" placeholder="z. B. RS 6 Avant, 2023" data-testid="input-review-model" />
+              </label>
               <fieldset disabled={createReview.isPending} className="min-w-0 sm:col-span-2">
                 <legend className="mb-2 text-xs text-white/70">Bewertung</legend>
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="flex gap-1" onMouseLeave={() => setHoverRating(null)}>
-                    {[1, 2, 3, 4, 5].map(rating => <label key={rating} className="relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-white/5" onMouseEnter={() => setHoverRating(rating)}>
+                    {[1, 2, 3, 4, 5].map(rating => <label key={rating} className="relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-none transition-colors hover:bg-white/5" onMouseEnter={() => setHoverRating(rating)}>
                       <input type="radio" name="rating" value={rating} checked={reviewRating === rating} onChange={() => setReviewRating(rating)} aria-label={`${rating} von 5 Sternen`} className="peer sr-only" data-testid={`input-review-rating-${rating}`} />
-                      <Star size={31} aria-hidden="true" className={`rounded-sm transition-colors peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-orange-300 ${rating <= (hoverRating ?? reviewRating) ? 'fill-orange-400 text-orange-400' : 'text-white/35'}`} />
+                      <Star size={31} aria-hidden="true" className={`rounded-none transition-colors peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-orange-300 ${rating <= (hoverRating ?? reviewRating) ? 'fill-orange-400 text-orange-400' : 'text-white/35'}`} />
                     </label>)}
                   </div>
                   <span className="text-xs font-semibold text-white/70" aria-live="polite">{reviewRating} von 5</span>
@@ -466,146 +413,141 @@ export default function HomePage() {
               </DialogContent>
             </Dialog>
           </div>
-          {reviewSuccess && <p role="status" className="mb-6 rounded-lg border border-emerald-700/20 bg-emerald-700/5 p-4 text-sm text-emerald-800">{reviewSuccess}</p>}
-          {reviewQuery.isLoading && <div className="h-44 animate-pulse rounded-xl bg-muted" />}
+          {reviewSuccess && <p role="status" className="mb-6 rounded-none border border-emerald-700/20 bg-emerald-700/5 p-4 text-sm text-emerald-800">{reviewSuccess}</p>}
+          {reviewQuery.isLoading && <div className="h-44 animate-pulse rounded-none bg-muted" />}
           {reviewQuery.isError && <p className="text-sm text-destructive" role="alert">Die Bewertungen konnten nicht geladen werden. <button onClick={() => void reviewQuery.refetch()} className="underline">Erneut versuchen</button></p>}
-          {!reviewQuery.isLoading && !reviewQuery.isError && reviews.length === 0 && <div className="rounded-xl border border-border bg-card px-6 py-8 text-center"><MessageCircle size={30} className="mx-auto text-accent" /><p className="mt-4 text-sm text-muted-foreground">Es gibt noch keine veröffentlichten Bewertungen. Teilen Sie als Erster Ihre Erfahrung.</p></div>}
+          {!reviewQuery.isLoading && !reviewQuery.isError && reviews.length === 0 && <div className="rounded-none border border-border bg-card px-6 py-8 text-center"><MessageCircle size={30} className="mx-auto text-accent" /><p className="mt-4 text-sm text-muted-foreground">Es gibt noch keine veröffentlichten Bewertungen. Teilen Sie als Erster Ihre Erfahrung.</p></div>}
           {reviews.length > 0 && <ReviewsCarousel reviews={reviews} />}
-          <div className="mt-6 grid grid-cols-2 gap-y-4 rounded-2xl border border-white bg-white/65 px-5 py-4 shadow-[0_5px_20px_-12px_rgba(34,45,51,.15)] backdrop-blur-sm lg:grid-cols-4">
+          <div className="mt-8 grid grid-cols-2 overflow-hidden rounded-none border border-primary/10 bg-white shadow-[0_8px_30px_-18px_rgba(29,47,58,.2)] lg:grid-cols-4">
             {[
               { icon: MessageCircle, value: String(reviews.length), label: 'Veröffentlichte Bewertungen' },
               { icon: Star, value: `${averageReviewRating} / 5`, label: 'Durchschnittsbewertung' },
               { icon: ShieldCheck, value: 'Persönlich geprüft', label: 'Vor der Veröffentlichung' },
               { icon: Gauge, value: 'Alle Fahrzeugmarken', label: 'PKW, SUV, Transporter u.v.m.' },
-            ].map(({ icon: Icon, value, label }) => <div key={label} className="flex flex-col items-start gap-3 px-3 sm:flex-row sm:items-center lg:border-l lg:border-border lg:px-5 lg:first:border-l-0"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-orange-50 text-accent"><Icon size={19} /></span><div><p className="text-xs font-bold text-foreground">{value}</p><p className="mt-1 text-[11px] leading-5 text-muted-foreground">{label}</p></div></div>)}
+            ].map(({ icon: Icon, value, label }, index) => (
+              <div
+                key={label}
+                className={`flex min-w-0 items-center gap-3 p-3.5 sm:gap-4 sm:p-6 ${
+                  index >= 2 ? 'border-t border-primary/10' : ''
+                } ${index % 2 === 1 ? 'border-l border-primary/10' : ''} lg:border-t-0 lg:border-l lg:first:border-l-0`}
+              >
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-none border border-orange-100 bg-orange-50 text-accent sm:h-12 sm:w-12 sm:rounded-none">
+                  <Icon size={20} strokeWidth={1.7} aria-hidden="true" className="sm:hidden" />
+                  <Icon size={22} strokeWidth={1.7} aria-hidden="true" className="hidden sm:block" />
+                </span>
+                <div className="min-w-0">
+                  <p
+                    className={
+                      index < 2
+                        ? 'text-xl font-bold leading-none tracking-tight text-primary tabular-nums sm:text-3xl'
+                        : 'text-xs font-bold leading-snug text-primary sm:text-sm'
+                    }
+                  >
+                    {value}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-tight text-muted-foreground sm:mt-2 sm:text-xs sm:leading-relaxed">
+                    {label}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      <section id="rezervo" className="scroll-mt-16 bg-primary px-5 py-24 text-white md:px-10 md:py-32">
-        <div className="mx-auto max-w-[1340px]">
-          <div className="mb-12 grid gap-8 md:grid-cols-[1fr_360px] md:items-end">
-            <div>
-              <SectionEyebrow inverse>Online-Terminvereinbarung</SectionEyebrow>
-              <h2 className="mt-5 font-display text-6xl font-bold uppercase leading-[.87] md:text-8xl">Wählen Sie<br />Ihren Wunschtag.</h2>
-            </div>
-            <p className="text-sm leading-7 text-white/55">Fragen Sie Ihren Termin bequem online an. Wir bestätigen die Details persönlich mit Ihnen.</p>
-          </div>
-          <div className="grid overflow-hidden border border-white/15 lg:grid-cols-[.8fr_1.2fr]">
-            <div className="border-b border-white/15 p-6 md:p-9 lg:border-b-0 lg:border-r">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="eyebrow text-white/45">Verfügbarkeit</span>
-                  <h3 className="mt-2 font-display text-3xl font-bold uppercase">{monthsDe[month.getMonth()]} {month.getFullYear()}</h3>
-                </div>
-                <div className="flex gap-2">
-                  <button type="button" onClick={() => changeMonth(-1)} aria-label="Vorheriger Monat" className="grid h-10 w-10 place-items-center border border-white/20 hover:bg-white/10" data-testid="button-previous-month"><ChevronLeft size={17} /></button>
-                  <button type="button" onClick={() => changeMonth(1)} aria-label="Nächster Monat" className="grid h-10 w-10 place-items-center border border-white/20 hover:bg-white/10" data-testid="button-next-month"><ChevronRight size={17} /></button>
-                </div>
-              </div>
-              {availabilityQuery.isLoading && <div className="mt-6 grid grid-cols-7 gap-2">{Array.from({ length: 14 }).map((_, index) => <div key={index} className="h-10 animate-pulse bg-white/10" />)}</div>}
-              {availabilityQuery.isError && (
-                <div className="mt-6 border border-white/20 p-4 text-xs text-white/70" role="alert">
-                  Die verfügbaren Zeiten konnten nicht geladen werden.
-                  <button type="button" onClick={() => void availabilityQuery.refetch()} className="ml-2 text-orange-300 underline">Erneut versuchen</button>
-                </div>
-              )}
-              {!availabilityQuery.isLoading && !availabilityQuery.isError && availableDays.length === 0 && <div className="mt-6 border border-dashed border-white/20 p-5 text-xs leading-6 text-white/55">Für diesen Monat sind keine Termine veröffentlicht. Wählen Sie einen anderen Monat oder schreiben Sie uns.</div>}
-              {availableDays.length > 0 && (
-                <div className="mt-6">
-                  <div className="grid grid-cols-7 gap-1.5 text-center text-[9px] font-bold uppercase text-white/35">
-                    {['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((letter, index) => <span key={`${letter}-${index}`} className="py-2">{letter}</span>)}
-                  </div>
-                  <div className="grid grid-cols-7 gap-1.5">
-                    {(() => {
-                      const start = new Date(month.getFullYear(), month.getMonth(), 1);
-                      const offset = (start.getDay() + 6) % 7;
-                      const lastDay = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
-                      return Array.from({ length: offset + lastDay }).map((_, index) => {
-                        if (index < offset) return <span key={`blank-${index}`} />;
-                        const date = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-${String(index - offset + 1).padStart(2, '0')}`;
-                         const day = availableDays.find((item) => calendarDateKey(item.date) === date);
-                        const enabled = Boolean(day?.open && day.slots.some((slot) => slot.available));
-                        return <button key={date} type="button" disabled={!enabled} onClick={() => { setSelectedDay(date); setSelectedTime(''); }} className={`relative grid aspect-square place-items-center text-xs transition-colors ${selectedDay === date ? 'bg-accent font-bold text-foreground' : enabled ? 'bg-white/10 text-white hover:bg-white/20' : 'text-white/20'}`} aria-label={`${index - offset + 1} ${monthsDe[month.getMonth()]}`} data-testid={`button-day-${date}`}>
-                          {index - offset + 1}
-                          {enabled && selectedDay !== date && <span className="absolute bottom-1 h-1 w-1 rounded-full bg-orange-300" />}
-                        </button>;
-                      });
-                    })()}
-                  </div>
-                </div>
-              )}
-              {selectedAvailability && (
-                <div className="mt-6 border-t border-white/15 pt-5">
-                   <p className="text-xs font-semibold">{formatCalendarDate(selectedDay, { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                     {selectedAvailability.slots.map((slot) => <button key={slot.time} type="button" disabled={!slot.available} onClick={() => setSelectedTime(slot.time)} className={`border px-3 py-2 text-[11px] ${selectedTime === slot.time ? 'border-accent bg-accent text-foreground' : slot.available ? 'border-white/20 text-white/70 hover:border-white/50' : 'cursor-not-allowed border-white/10 text-white/30 line-through'}`} data-testid={`button-slot-${slot.time}`} aria-label={`${slot.time} — ${slot.available ? 'frei' : 'belegt'}`}>{slot.time}{!slot.available && ' · Belegt'}</button>)}
-                  </div>
-                </div>
-              )}
-            </div>
-            <form className="grid gap-4 p-6 md:grid-cols-2 md:p-9" onSubmit={submitBooking}>
-              <label className="grid gap-2 text-xs text-white/65 md:col-span-2">Leistung
-                <select required name="serviceId" value={selectedServiceId} onChange={(event) => setSelectedServiceId(event.target.value)} className="h-12 border border-white/20 bg-[#213943] px-3 text-sm text-white outline-none focus:border-orange-300" data-testid="select-booking-service">
-                  <option value="" disabled>Leistung auswählen</option>
-                  {services.map((service) => <option key={service.id} value={service.id}>{service.name} — {service.priceLabel}</option>)}
-                  <option value="custom">Andere Leistung</option>
-                </select>
-              </label>
-              {selectedServiceId === 'custom' && <label className="grid gap-2 text-xs text-white/65 md:col-span-2">Gewünschte Leistung beschreiben<input required minLength={3} maxLength={160} name="customService" className="h-12 border border-white/20 bg-white/5 px-3 text-sm text-white outline-none focus:border-orange-300" data-testid="input-booking-custom-service" /></label>}
-              <label className="grid gap-2 text-xs text-white/65">Vollständiger Name<input required minLength={2} maxLength={120} name="customerName" className="h-12 border border-white/20 bg-white/5 px-3 text-sm text-white outline-none focus:border-orange-300" data-testid="input-booking-name" /></label>
-              <label className="grid gap-2 text-xs text-white/65">Telefon<input required minLength={5} maxLength={40} type="tel" name="phone" className="h-12 border border-white/20 bg-white/5 px-3 text-sm text-white outline-none focus:border-orange-300" data-testid="input-booking-phone" /></label>
-              <label className="grid gap-2 text-xs text-white/65">E-Mail<input required type="email" name="email" className="h-12 border border-white/20 bg-white/5 px-3 text-sm text-white outline-none focus:border-orange-300" data-testid="input-booking-email" /></label>
-              <label className="grid gap-2 text-xs text-white/65">Kennzeichen oder FIN (optional)<input maxLength={24} name="licensePlate" className="h-12 border border-white/20 bg-white/5 px-3 text-sm text-white outline-none focus:border-orange-300" data-testid="input-booking-plate" /></label>
-              <label className="grid gap-2 text-xs text-white/65">Marke<input required maxLength={80} name="vehicleMake" className="h-12 border border-white/20 bg-white/5 px-3 text-sm text-white outline-none focus:border-orange-300" data-testid="input-booking-make" /></label>
-              <label className="grid gap-2 text-xs text-white/65">Modell<input required maxLength={80} name="vehicleModel" className="h-12 border border-white/20 bg-white/5 px-3 text-sm text-white outline-none focus:border-orange-300" data-testid="input-booking-model" /></label>
-              <label className="grid gap-2 text-xs text-white/65">Baujahr<input required type="number" min="1950" max="2100" name="vehicleYear" className="h-12 border border-white/20 bg-white/5 px-3 text-sm text-white outline-none focus:border-orange-300" data-testid="input-booking-year" /></label>
-              <label className="grid gap-2 text-xs text-white/65">Gewähltes Datum<input readOnly required value={selectedDay} placeholder="Datum im Kalender auswählen" className="h-12 border border-white/20 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-white/35" data-testid="input-booking-date" /></label>
-              <label className="grid gap-2 text-xs text-white/65 md:col-span-2">Weitere Hinweise<textarea maxLength={2000} name="notes" rows={3} className="resize-y border border-white/20 bg-white/5 px-3 py-3 text-sm text-white outline-none focus:border-orange-300" placeholder="Beschreiben Sie kurz Ihr Anliegen (optional)" data-testid="input-booking-notes" /></label>
-              {(!selectedDay || !selectedTime) && <p className="text-[11px] text-orange-200 md:col-span-2">Wählen Sie einen freien Tag und eine Uhrzeit, um fortzufahren.</p>}
-              <div className="md:col-span-2">
-                <button type="submit" disabled={!selectedDay || !selectedTime || createBooking.isPending || services.length === 0} className="inline-flex min-h-12 items-center gap-3 bg-accent px-6 text-xs font-bold uppercase tracking-wider text-foreground disabled:cursor-not-allowed disabled:opacity-50" data-testid="button-submit-booking">{createBooking.isPending ? 'Wird gesendet…' : 'Anfrage senden'} <ArrowRight size={15} /></button>
-                {bookingSuccess && <p className="mt-4 flex items-center gap-2 text-sm text-emerald-200" role="status"><Check size={16} />{bookingSuccess}</p>}
-                {bookingError && <p className="mt-4 text-sm text-orange-200" role="alert">{bookingError}</p>}
-              </div>
-            </form>
-          </div>
-        </div>
-      </section>
 
-      <QuoteRequestForm />
-      <section id="kontakt" className="scroll-mt-16 px-5 py-24 md:px-10 md:py-32">
-        <div className="mx-auto grid max-w-[1340px] gap-12 lg:grid-cols-[.8fr_1.2fr]">
+
+      <section className="bg-white px-5 py-20 md:px-10 md:py-24">
+        <div className="mx-auto grid max-w-[1340px] gap-12 lg:grid-cols-[.7fr_1.3fr]">
           <div>
-            <SectionEyebrow>So finden Sie uns</SectionEyebrow>
-            <h2 className="mt-5 font-display text-6xl font-bold uppercase leading-[.88] md:text-8xl">Wir sind<br />für Sie da.</h2>
-            <p className="mt-6 max-w-[390px] text-sm leading-7 text-muted-foreground">Haben Sie vor der Terminvereinbarung eine Frage? Schreiben Sie uns, wir melden uns schnellstmöglich.</p>
-            <div className="mt-8 grid gap-5">
-              <div className="flex items-start gap-4">
-                <Phone className="mt-0.5 text-accent" size={18} />
-                <div><p className="text-[10px] font-bold uppercase tracking-wider">Telefon</p><p className="mt-1 text-sm text-muted-foreground">{shop?.phone ? <a href={`tel:${shop.phone.replace(/[^+\d]/g, '')}`} className="hover:text-accent" data-testid="link-shop-phone">{shop.phone}</a> : shopQuery.isLoading ? 'Wird geladen…' : shopQuery.isError ? 'Informationen konnten nicht geladen werden' : 'Telefonnummer folgt'}</p></div>
-              </div>
-              {shop?.emergencyPhone && <div className="flex items-start gap-4"><Phone className="mt-0.5 text-accent" size={18} /><div><p className="text-[10px] font-bold uppercase tracking-wider">Notfallnummer</p><a href={`tel:${shop.emergencyPhone.replace(/[^+\d]/g, '')}`} className="mt-1 inline-block text-sm text-muted-foreground hover:text-accent" data-testid="link-emergency-phone">{shop.emergencyPhone}</a></div></div>}
-              <div className="flex items-start gap-4">
-                <MapPin className="mt-0.5 text-accent" size={18} />
-                <div><p className="text-[10px] font-bold uppercase tracking-wider">Standort</p><p className="mt-1 text-sm text-muted-foreground">{shopQuery.isLoading ? 'Wird geladen…' : shopQuery.isError ? 'Informationen konnten nicht geladen werden' : [shop?.address, shop?.city].filter(Boolean).join(', ') || 'Adresse vor Veröffentlichung ergänzen'}</p></div>
-              </div>
-              <div className="flex items-start gap-4">
-                <Clock3 className="mt-0.5 text-accent" size={18} />
-                <div><p className="text-[10px] font-bold uppercase tracking-wider">Öffnungszeiten</p><p className="mt-1 text-sm text-muted-foreground">{shopQuery.isLoading ? 'Wird geladen…' : shopQuery.isError ? 'Informationen konnten nicht geladen werden' : shop?.openingHours || 'Öffnungszeiten vor Veröffentlichung ergänzen'}</p></div>
-              </div>
-              {shop?.email && <a href={`mailto:${shop.email}`} className="text-sm text-accent hover:underline">{shop.email}</a>}
-              {shop?.whatsapp && <a href={`https://wa.me/${shop.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="inline-flex w-fit items-center gap-2 text-xs font-bold text-accent hover:underline" data-testid="link-whatsapp"><MessageCircle size={15} /> Auf WhatsApp schreiben</a>}
-              {shopQuery.isError && <button type="button" onClick={() => void shopQuery.refetch()} className="w-fit text-left text-xs text-accent underline">Kontaktdaten erneut laden</button>}
-            </div>
-            {shop?.mapUrl ? (
-              <iframe src={shop.mapUrl} title="Standort unserer Werkstatt" loading="lazy" referrerPolicy="no-referrer-when-downgrade" className="mt-8 h-64 w-full border border-border" allowFullScreen data-testid="map-preview" />
-            ) : (
-              <div className="mt-8 grid h-64 place-items-center border border-dashed border-border bg-muted/50 px-6 text-center text-xs leading-5 text-muted-foreground">Die Karte erscheint, sobald ein Kartenlink hinterlegt ist.</div>
-            )}
-            {shop?.mapUrl && <a href={shop.mapUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 border-b border-accent pb-2 text-[10px] font-bold uppercase tracking-wider" data-testid="link-map">Karte öffnen <ArrowUpRight size={14} /></a>}
+            <SectionEyebrow>So arbeiten wir</SectionEyebrow>
+            <h2 className="mt-5 max-w-lg font-display text-[2.75rem] font-bold uppercase leading-[.9] md:text-[4rem]">Transparent,<br />von Anfang an.</h2>
           </div>
-          <div className="border border-border bg-card p-6 shadow-sm md:p-10">
+          <div className="relative pl-1 sm:pl-0 sm:grid sm:grid-cols-3 sm:gap-0">
+            {/* Timeline vertical rail for mobile */}
+            <div
+              className="absolute bottom-6 left-[27px] top-6 w-0.5 bg-gradient-to-b from-accent via-orange-400 to-orange-300 sm:hidden"
+              aria-hidden="true"
+            />
+            {[
+              ['01', 'Bedarf schildern', 'Wählen Sie eine Leistung und nennen Sie uns die Fahrzeugdaten.'],
+              ['02', 'Termin auswählen', 'Sehen Sie freie Termine und senden Sie Ihre Anfrage.'],
+              ['03', 'Wir melden uns', 'Wir bestätigen Ihren Termin und besprechen die nächsten Schritte.'],
+            ].map(([number, title, detail]) => (
+              <div
+                key={number}
+                className="relative flex items-start gap-4 pb-8 last:pb-0 sm:block sm:ml-6 sm:border-l sm:border-t-0 sm:border-primary/20 sm:first:ml-0 sm:pb-0 sm:pl-6"
+              >
+                {/* Mobile timeline node badge */}
+                <div className="relative z-10 grid h-12 w-12 shrink-0 place-items-center rounded-none border-2 border-white bg-gradient-to-br from-orange-400 to-accent font-display text-lg font-bold text-white shadow-md shadow-orange-500/25 sm:hidden">
+                  {number}
+                </div>
+
+                {/* Desktop large number */}
+                <span className="hidden font-display text-5xl font-bold text-accent sm:block">{number}</span>
+
+                {/* Content */}
+                <div className="min-w-0 pt-1 sm:pt-4">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-accent sm:hidden">
+                    Schritt {number}
+                  </span>
+                  <h3 className="font-display text-xl font-bold uppercase leading-tight sm:mt-0 sm:text-2xl">{title}</h3>
+                  <p className="mt-1.5 max-w-[280px] text-xs leading-5 text-muted-foreground sm:mt-2 sm:max-w-[220px] sm:leading-6">
+                    {detail}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+
+
+
+
+      {/* Brand Slider: Automarken, die wir servicieren (Audi, BMW, Mercedes, VW/Golf, Ford etc.) */}
+      <BrandsSlider />
+
+      <section id="kontakt" className="scroll-mt-16 bg-white px-5 py-24 md:px-10 md:py-32">
+        <div className="mx-auto grid max-w-[1340px] gap-12 lg:grid-cols-[.9fr_1.1fr]">
+          <div className="flex flex-col">
+            <div>
+              <SectionEyebrow>So finden Sie uns</SectionEyebrow>
+              <h2 className="mt-5 font-display text-[3rem] font-bold uppercase leading-[.88] md:text-[4.8rem]">Wir sind<br />für Sie da.</h2>
+              <p className="mt-6 max-w-[460px] text-sm leading-7 text-muted-foreground">
+                Haben Sie vor der Terminvereinbarung eine Frage? Schreiben Sie uns direkt über unser Kontaktformular oder besuchen Sie uns vor Ort in unserer Werkstatt.
+              </p>
+            </div>
+            {shop?.mapUrl && (
+              <div className="mt-8 overflow-hidden rounded-none border border-border bg-card shadow-sm">
+                <iframe
+                  src={(shop as typeof shop & { mapEmbedUrl?: string }).mapEmbedUrl || (shop.mapUrl.includes('/maps/embed') ? shop.mapUrl : undefined)}
+                  title="Standort unserer Werkstatt"
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  className="h-64 w-full"
+                  allowFullScreen
+                  data-testid="map-preview"
+                />
+                <div className="flex items-center justify-between border-t border-border/80 bg-muted/20 px-5 py-3.5">
+                  <span className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                    <MapPin size={15} className="text-accent" /> Werkstatt auf Google Maps
+                  </span>
+                  <a
+                    href={shop.mapUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-accent hover:underline"
+                    data-testid="link-map"
+                  >
+                    Karte öffnen <ArrowUpRight size={14} />
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="rounded-none border border-border/80 bg-card p-6 shadow-xl md:p-10">
             <div className="mb-7">
               <span className="eyebrow text-accent">Direkter Kontakt</span>
               <h3 className="mt-2 font-display text-4xl font-bold uppercase">Was können wir für Sie tun?</h3>
@@ -625,26 +567,46 @@ export default function HomePage() {
         </div>
       </section>
 
-      <footer className="bg-primary px-5 py-10 text-white md:px-10">
-        <div className="mx-auto flex max-w-[1340px] flex-col justify-between gap-8 border-b border-white/15 pb-8 md:flex-row md:items-end">
-          <div>
-            <span className="font-display text-3xl font-bold uppercase">{businessName}</span>
-            <p className="mt-2 text-xs text-white/45">{businessTagline}</p>
+      <footer className="bg-[#f4f1ec] px-5 pt-14 pb-6 text-foreground md:px-10 md:pt-20 md:pb-6">
+        <div className="mx-auto max-w-[1340px]">
+          <div className="grid gap-10 pb-12 sm:grid-cols-2 lg:grid-cols-[1.1fr_1fr_1fr_1fr]">
+            <div>
+              <a href="#fillimi" aria-label={`${businessName} — Startseite`}><img src={`${import.meta.env.BASE_URL}service-car-logo.png`} alt={businessName} width={817} height={273} className="h-16 w-auto max-w-full object-contain" /></a>
+              <p className="mt-6 max-w-[270px] text-sm leading-7 text-muted-foreground">Wartung, Reparatur und Fahrzeugpflege – persönlich, sorgfältig und zuverlässig.</p>
+              <div className="mt-5 flex flex-wrap gap-2.5">
+                {[{ label: 'Facebook', url: shop?.facebookUrl, Icon: SiFacebook }, { label: 'TikTok', url: shop?.tiktokUrl, Icon: SiTiktok }, { label: 'Instagram', url: shop?.instagramUrl, Icon: SiInstagram }].map(({ label, url, Icon }) => url ? <a key={label} href={url} target="_blank" rel="noreferrer" aria-label={label} className="grid h-10 w-10 place-items-center border border-border bg-white text-accent transition-colors hover:border-accent hover:bg-accent hover:text-white"><Icon size={18} /></a> : <span key={label} aria-label={`${label} – Link folgt`} title={`${label} – Link folgt`} className="grid h-10 w-10 place-items-center border border-border bg-white text-accent"><Icon size={18} /></span>)}
+                {shop?.whatsapp && <a href={`https://wa.me/${shop.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" aria-label="WhatsApp" className="grid h-10 w-10 place-items-center border border-border bg-white text-accent hover:border-accent"><MessageCircle size={18} /></a>}
+              </div>
+            </div>
+            <div>
+              <h3 className="eyebrow text-muted-foreground">Kontakt</h3>
+              <div className="mt-5 space-y-3 text-sm leading-6">
+                {shop?.phone && <a href={`tel:${shop.phone.replace(/[^+\d]/g, '')}`} className="block font-semibold text-accent" data-testid="link-shop-phone">{shop.phone}</a>}
+                {shop?.emergencyPhone && <a href={`tel:${shop.emergencyPhone.replace(/[^+\d]/g, '')}`} className="block font-semibold text-accent" data-testid="link-emergency-phone">{shop.emergencyPhone}</a>}
+                {shop?.email && <a href={`mailto:${shop.email}`} className="block break-all hover:text-accent">{shop.email}</a>}
+              </div>
+            </div>
+            <div>
+              <h3 className="eyebrow text-muted-foreground">Navigation</h3>
+              <nav className="mt-5 grid gap-3 text-sm" aria-label="Navigation im Footer">
+                <a href="#rreth-nesh" className="hover:text-accent">Über uns</a>
+                <a href="#sherbimet" className="hover:text-accent">Leistungen</a>
+                <a href="#vleresime" className="hover:text-accent">Bewertungen</a>
+                <a href="#kontakt" className="hover:text-accent">Kontakt</a>
+                <a href="#rezervo" className="hover:text-accent">Termin vereinbaren</a>
+              </nav>
+            </div>
+            <div>
+              <h3 className="eyebrow text-muted-foreground">Öffnungszeiten</h3>
+              <dl className="mt-5 space-y-3 text-sm">
+                {shop?.weeklyHours?.map((day, index) => <div key={index} className="flex justify-between gap-3"><dt>{['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][index]}</dt><dd className="text-right tabular-nums">{!day.enabled ? <span className="text-muted-foreground">Geschlossen</span> : `${day.start}–${day.end} Uhr`}</dd></div>)}
+              </dl>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-x-6 gap-y-3 text-[10px] font-semibold uppercase tracking-wider text-white/60">
-            <a href="#rreth-nesh" className="hover:text-orange-300">Über uns</a>
-            <a href="#punet" className="hover:text-orange-300">Arbeiten</a>
-            <a href="#sherbimet" className="hover:text-orange-300">Leistungen</a>
-            <a href="#angebote" className="hover:text-orange-300">Angebot</a>
-            <a href="#vleresime" className="hover:text-orange-300">Bewertungen</a>
-            <a href="#rezervo" className="hover:text-orange-300">Termin anfragen</a>
-            <a href="#kontakt" className="hover:text-orange-300">Kontakt</a>
-            <a href="/sign-in" className="hover:text-orange-300">Administrator-Anmeldung</a>
+          <div className="flex flex-col justify-between gap-4 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center">
+            <span>© {new Date().getFullYear()} {businessName}. Alle Rechte vorbehalten.</span>
+            <a href="/sign-in" className="inline-flex items-center gap-2 hover:text-accent"><LogIn size={14} />Admin Portal</a>
           </div>
-        </div>
-        <div className="mx-auto flex max-w-[1340px] flex-col justify-between gap-2 pt-5 text-[10px] text-white/35 sm:flex-row">
-          <span>© {new Date().getFullYear()} {businessName}</span>
-          <span>Faire Wartung. Termine bequem online.</span>
         </div>
       </footer>
       {selectedWork && (

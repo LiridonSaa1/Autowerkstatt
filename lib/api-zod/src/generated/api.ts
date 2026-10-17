@@ -167,6 +167,7 @@ export const GetAvailabilityQueryParams = zod.object({
 })
 
 export const GetAvailabilityResponseItem = zod.object({
+  "reason": zod.string().nullable().optional(),
   "date": zod.coerce.date(),
   "open": zod.boolean(),
   "slots": zod.array(zod.object({

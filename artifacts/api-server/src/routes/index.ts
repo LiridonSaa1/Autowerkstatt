@@ -1,4 +1,5 @@
 import reviewVehiclesRouter from './review-vehicles';
+import bookingScheduleRouter from './booking-schedule';
 import servicesRouter from './services';
 import portfolioImagesRouter from './portfolio-images';
 import integrationsRouter from './integrations';
@@ -13,6 +14,7 @@ import adminRouter from "./admin";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(bookingScheduleRouter);
 router.use(reviewVehiclesRouter);
 router.use(servicesRouter);
 router.use(portfolioImagesRouter);

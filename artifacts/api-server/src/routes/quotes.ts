@@ -1,5 +1,7 @@
-import { resendConfig } from '../lib/integrations';
+import { brevoConfig } from '../lib/integrations';
 import { sendEmail } from '../lib/send-email';
+import { notifyBusiness } from '../lib/business-notifications';
+import { renderQuoteOfferEmail } from '../lib/email-templates';
 import { Router } from 'express';
 import { desc, eq } from 'drizzle-orm';
 import { z } from 'zod/v4';
@@ -17,6 +19,7 @@ router.post('/quotes', async (req, res) => {
   const parsed = input.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: 'Prüfen Sie die Angaben Ihrer Anfrage.' }); return; }
   const [row] = await db.insert(quotesTable).values(parsed.data).returning({ id: quotesTable.id });
+  await notifyBusiness({ kind: 'quote', id: row.id, customer: { name: parsed.data.name, email: parsed.data.email }, phone: parsed.data.phone, vehicle: parsed.data.vehicle, parts: parsed.data.parts, preferredDate: parsed.data.preferredDate });
   res.status(201).json(row);
 });
 router.get('/admin/quotes', requireAdmin, async (_req, res) => {
@@ -24,8 +27,8 @@ router.get('/admin/quotes', requireAdmin, async (_req, res) => {
 });
 router.get('/admin/quotes/sender', requireAdmin, async (_req, res) => {
   const shop = await readSettings();
-  const resend = await resendConfig();
-  res.json({ name: shop.name, email: resend.key ? resend.from : process.env.BREVO_SENDER_EMAIL || shop.email, configured: Boolean(resend.key ? resend.from : process.env.BREVO_API_KEY && (process.env.BREVO_SENDER_EMAIL || shop.email)) });
+  const brevo = await brevoConfig();
+  res.json({ name: shop.name, email: brevo.from || shop.email, configured: Boolean(brevo.key && (brevo.from || shop.email)) });
 });
 router.patch('/admin/quotes/:id', requireAdmin, async (req, res) => {
   const id = z.coerce.number().int().positive().safeParse(req.params.id);
@@ -45,8 +48,26 @@ router.post('/admin/quotes/:id/send', requireAdmin, async (req, res) => {
   if (!quote) { res.status(404).json({ error: 'Die Anfrage wurde nicht gefunden.' }); return; }
   const shop = await readSettings();
   sending.add(id.data);
+  const html = renderQuoteOfferEmail({
+    customerName: quote.name,
+    quoteId: id.data,
+    subject: parsed.data.subject,
+    message: parsed.data.message,
+    vehicle: quote.vehicle,
+    parts: quote.parts,
+    business: shop,
+  });
   try {
-    await sendEmail({ name: quote.name, email: parsed.data.email, subject: parsed.data.subject, message: parsed.data.message, senderName: shop.name, fallbackEmail: shop.email });
+    await sendEmail({
+      name: quote.name,
+      email: parsed.data.email,
+      subject: parsed.data.subject,
+      message: parsed.data.message,
+      html,
+      senderName: shop.name,
+      fallbackEmail: shop.email,
+      replyTo: shop.email ? { name: shop.name, email: shop.email } : undefined,
+    });
     await db.update(quotesTable).set({ status: 'quoted', sentAt: new Date() }).where(eq(quotesTable.id, id.data));
     res.json({ sent: true });
   } catch { res.status(502).json({ error: 'Der Versand wurde nicht bestätigt. Prüfen Sie den E-Mail-Verlauf vor einem erneuten Versuch.' }); }

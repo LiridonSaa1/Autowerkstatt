@@ -138,6 +138,7 @@ export interface AvailabilitySlot {
 }
 
 export interface DayAvailability {
+  reason?: string | null;
   date: string;
   open: boolean;
   slots: AvailabilitySlot[];

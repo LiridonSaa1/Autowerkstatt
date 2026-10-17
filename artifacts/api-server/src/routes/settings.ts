@@ -10,6 +10,7 @@ export const settingsSchema = z.object({
   name: text.min(1), tagline: text, phone: text, whatsapp: text,
   email: z.union([z.literal(''), z.email()]), address: text, city: text,
   emergencyPhone: text, openingHours: text, mapUrl: optionalUrl,
+  facebookUrl: optionalUrl.default(''), instagramUrl: optionalUrl.default(''), tiktokUrl: optionalUrl.default(''),
 });
 export async function readSettings() {
   const [saved] = await db.select().from(siteSettingsTable).where(eq(siteSettingsTable.id, 1));
@@ -20,6 +21,7 @@ export async function readSettings() {
     email: process.env.SHOP_EMAIL ?? '', address: process.env.SHOP_ADDRESS ?? '',
     city: process.env.SHOP_CITY ?? '', emergencyPhone: process.env.SHOP_EMERGENCY_PHONE ?? '',
     openingHours: process.env.SHOP_OPENING_HOURS ?? '', mapUrl: process.env.SHOP_MAP_URL ?? '',
+    facebookUrl: '', instagramUrl: '', tiktokUrl: '',
     ...saved?.values,
   };
   // Translate the original default when it was saved before the German version.

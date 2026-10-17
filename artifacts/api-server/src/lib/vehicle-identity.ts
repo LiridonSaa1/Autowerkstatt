@@ -50,25 +50,24 @@ export function matchesVehicle(title: string, vehicle: VehicleIdentity) {
   return value.includes(compact(vehicle.make)) && value.includes(compact(vehicle.model));
 }
 const httpsHost = (value: string, host: string) => { try { const url = new URL(value); return url.protocol === 'https:' && url.hostname === host; } catch { return false; } };
-async function findImage(identity: VehicleIdentity): Promise<Omit<VehicleVisual, 'identity'>> {
-  const empty = { imageUrl: null, sourceUrl: null, attribution: null, licenseUrl: null };
-  const query = new URLSearchParams({ action: 'query', format: 'json', generator: 'search', gsrnamespace: '6', gsrsearch: `"${identity.make.replace(/[^\p{L}\d -]/gu, '')}" "${identity.model.replace(/[^\p{L}\d -]/gu, '')}" -intitle:interior -intitle:engine`, gsrlimit: '8', prop: 'imageinfo', iiprop: 'url|extmetadata', iiurlwidth: '320', iiextmetadatafilter: 'Artist|LicenseShortName|LicenseUrl|AttributionRequired' });
-  const response = await fetch(`https://commons.wikimedia.org/w/api.php?${query}`, { headers: { 'User-Agent': 'KFZServiceVehicleCards/1.0 (vehicle example images)' }, signal: AbortSignal.timeout(8000) });
-  if (!response.ok) return empty;
-  type Info = { thumburl?: string; descriptionurl?: string; extmetadata?: Record<string, { value: string }> };
-  const result = await response.json() as { query?: { pages?: Record<string, { title: string; imageinfo?: Info[] }> } };
-  const pages = Object.values(result.query?.pages || {}).filter(page => matchesVehicle(page.title, identity) && !/\b(interior|engine|logo|badge|wheel|dashboard|rear)\b/i.test(page.title));
-  pages.sort((a, b) => Number(Boolean(identity.year && b.title.includes(String(identity.year)))) - Number(Boolean(identity.year && a.title.includes(String(identity.year)))));
-  for (const page of pages) {
-    const info = page.imageinfo?.[0]; const metadata = info?.extmetadata || {};
-    const license = plain(metadata.LicenseShortName?.value || ''); const artist = plain(metadata.Artist?.value || '');
-    if (!info?.thumburl || !info.descriptionurl || !httpsHost(info.thumburl, 'upload.wikimedia.org') || !httpsHost(info.descriptionurl, 'commons.wikimedia.org')) continue;
-    if (!/^(CC BY(?:-SA)?|CC0|Public domain)/i.test(license) || !artist) continue;
-    const licenseUrl = metadata.LicenseUrl?.value || '';
-    if (!/^https?:\/\/(?:creativecommons\.org|commons\.wikimedia\.org)\//.test(licenseUrl)) continue;
-    return { imageUrl: info.thumburl, sourceUrl: info.descriptionurl, attribution: `${artist} · ${license}`, licenseUrl };
+function findImage(identity: VehicleIdentity): Omit<VehicleVisual, 'identity'> {
+  const combined = `${identity.make} ${identity.model}`.toLowerCase();
+  let imageUrl = '/vehicles/bmw-5.png';
+  if (combined.includes('rs6') || combined.includes('rs 6') || (combined.includes('audi') && (combined.includes('a6') || combined.includes('rs')))) {
+    imageUrl = '/vehicles/audi-rs6.png';
+  } else if (combined.includes('xm') || combined.includes('suv') || combined.includes('q7') || combined.includes('x5') || combined.includes('x6') || combined.includes('tiguan') || combined.includes('cayenne')) {
+    imageUrl = '/vehicles/bmw-xm.png';
+  } else if (combined.includes('bmw') || combined.includes('5er') || combined.includes('5 series') || combined.includes('3er') || combined.includes('3 series') || combined.includes('m3') || combined.includes('m5')) {
+    imageUrl = '/vehicles/bmw-5.png';
+  } else if (combined.includes('mercedes') || combined.includes('benz') || combined.includes('c-class') || combined.includes('c-klasse') || combined.includes('e-class') || combined.includes('e-klasse') || combined.includes('c200') || combined.includes('c300')) {
+    imageUrl = '/vehicles/mercedes-c-class.png';
+  } else if (combined.includes('golf') || combined.includes('volkswagen') || combined.includes('vw') || combined.includes('polo') || combined.includes('gti')) {
+    imageUrl = '/vehicles/vw-golf.png';
+  } else if (combined.includes('audi')) {
+    imageUrl = '/vehicles/audi-rs6.png';
   }
-  return empty;
+
+  return { imageUrl, sourceUrl: imageUrl, attribution: `${identity.make} ${identity.model}`, licenseUrl: null };
 }
 const cache = new Map<string, { expires: number; value: VehicleVisual }>();
 const pending = new Map<string, Promise<VehicleVisual>>();
