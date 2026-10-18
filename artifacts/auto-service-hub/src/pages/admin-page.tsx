@@ -1,4 +1,5 @@
 import ServicesPanel from './services-panel';
+import { markActivityInternal } from '@/lib/checkout-activity';
 import DeleteConfirmation from '@/components/delete-confirmation';
 import IntegrationsPanel, { IntegrationUnlock } from './integrations-panel';
 import BookingCalendar from './booking-calendar';
@@ -89,6 +90,11 @@ function AdminPage() {
   const reviewParams = useMemo(() => ({}), []);
   const appointmentParams = useMemo(() => appointmentFilter ? { status: appointmentFilter } : {}, [appointmentFilter]);
   const summaryQuery = useGetAdminSummary();
+  useEffect(() => {
+    if (!summaryQuery.isSuccess) return;
+    const sessionId = markActivityInternal();
+    void customFetch('/api/admin/checkout-activity/internal', { method: 'POST', body: JSON.stringify({ sessionId }) }).catch(() => {});
+  }, [summaryQuery.isSuccess]);
   const appointmentsQuery = useListAdminAppointments(appointmentParams, {
     query: { queryKey: getListAdminAppointmentsQueryKey(appointmentParams) },
   });
@@ -235,6 +241,7 @@ function AdminPage() {
   <span className="rounded bg-accent/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accent">Admin</span>
 </div>
               <nav aria-label="Administrationsmenü" className="flex gap-2 overflow-x-auto px-3 py-3 lg:grid lg:overflow-visible lg:py-5">
+                <Link href="/admin/checkout-activity" className="flex min-h-11 shrink-0 items-center gap-3 whitespace-nowrap border-l-2 border-transparent px-3 py-3 text-xs font-bold text-sidebar-foreground/65 hover:bg-sidebar-accent"><Search size={17} />Checkout-Aktivität</Link>
                 <p className="hidden px-3 pb-3 pt-2 lg:block text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/50">VERWALTUNG</p>
                 {[
                   { id: 'appointments' as const, label: 'Termine', icon: CalendarDays },

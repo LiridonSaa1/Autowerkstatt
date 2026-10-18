@@ -11,3 +11,7 @@ for (const workspace of ['@workspace/api-server', '@workspace/auto-service-hub']
   });
   if (result.status !== 0) process.exit(result.status || 1);
 }
+// Additive, idempotent schema migration for checkout analytics. Fail deploy rather
+// than publishing a panel whose database table is missing.
+const migration = spawnSync(process.execPath, ['scripts/checkout-activity-migrate.mjs'], { stdio: 'inherit', env: process.env });
+if (migration.status !== 0) process.exit(migration.status || 1);
